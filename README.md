@@ -2,7 +2,7 @@
 
 # A workbench for the translational control of gene expression
 
-These codes allow to quantify similarities between Ribo-seq Profiling coming from different datasets.
+These codes allow us to quantify similarities between Ribo-seq Profiling coming from different datasets.
 
 ## Downstream phase:
 
