@@ -1,10 +1,10 @@
 
 
-##A workbench for the translational control of gene expression
+# A workbench for the translational control of gene expression
 
 These codes allow to quantify similarities between Ribo-seq Profiling coming from different datasets.
 
-##Downstream phase:
+## Downstream phase:
 
 - Signal digitalisation
 
