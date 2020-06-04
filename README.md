@@ -7,7 +7,7 @@ This repository contains the codes (in R and Python) used to compare the ORF-spe
 Our analysis of the ORF-specific Ribo-seq profiles consist of two phases:
 
 ## Upstream phase:
-The upstream phase allows us to compute the Ribo-seq profiles starting from the raw Ribo-seq data.
+The upstream phase allows us to compute the Ribo-seq profiles starting from the raw Ribo-seq data
 
 ## Downstream phase:
 The downstream phase is the core of our method and is articulated as follows:
