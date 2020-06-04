@@ -18,6 +18,4 @@ The downstream phase is the core of our method and is articulated as follows:
 
 - Assessment of the similarity scores
 
-- Identification of the "significantly reproducible Ribo-seq profiles
-
-- 
+- Identification of the "significantly reproducible Ribo-seq profiles"
