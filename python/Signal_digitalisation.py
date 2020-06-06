@@ -105,7 +105,7 @@ class MatricesExtractor:
 def main():
     # I/O directories
     input_data_dir = "input_data/"
-    output_data_dir = "output_matrix/"
+    output_data_dir = "output_matrix_sample/"
 
     working_dir = os.getcwd()  # Sets the working directory
 
