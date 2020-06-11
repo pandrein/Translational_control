@@ -21,6 +21,8 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 
+addRand = True
+
 
 class MatricesExtractor:
     def __init__(self, bed_table_FP_reduced, genes):
@@ -47,14 +49,19 @@ class MatricesExtractor:
 
         # extracts the matrix_coverage and matrix_01
         matrix_coverage = self.create_matrix_coverage(gen_list, gen_max_lenght)
-        matrix_01 = self.create_matrix_01(matrix_coverage)
+
+        if addRand:
+            rand_add = (np.random.random(np.shape(matrix_coverage)) * 0.001) + 0.001  # add small random values to avoid an artifact that comes out whan we compute the median of a vector having many zeros
+            matrix_coverage = matrix_coverage + rand_add
+
+        matrix_01, median = self.create_matrix_01(matrix_coverage)
 
         # converts the matrices to pandas dataFrame
         gene_name_list = bed_table_FP_reduced.index.unique()
         pd_matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
 
-        return pd_matrix_coverage, matrix_01
+        return pd_matrix_coverage, matrix_01, median
 
     def create_matrix_coverage(self, gen_list, gen_max_lenght):
         # CREATING MATRIX COVERAGE
@@ -84,22 +91,20 @@ class MatricesExtractor:
         # CREATING MATRIX 01
         # compare the profile heights at each nucleotide position (coverage) with its median value computed along the entire ORF
 
-        rand_add = (np.random.random(np.shape(matrix_coverage)) * 0.001) + 0.001  # add small random values to avoid an artifact that comes out whan we compute the median of a vector having many zeros
-        matrix_01 = matrix_coverage + rand_add
-
         # computes the median of the coverage values at each nucleotide.
-        median = np.nanmedian(matrix_01, axis=1) #Computes the median along the entire ORF, while ignoring NaNs.
+        median = np.nanmedian(matrix_coverage, axis=1)  # Computes the median along the entire ORF, while ignoring NaNs.
+        median_vector = median
         median = np.expand_dims(median, axis=1)
-        median = median.repeat(np.shape(matrix_01)[1], axis=1)
+        median = median.repeat(np.shape(matrix_coverage)[1], axis=1)
 
-        matrix_01 = np.subtract(matrix_01, median)  # element by element subtraction between arrays
+        matrix_01 = np.subtract(matrix_coverage, median)  # element by element subtraction between arrays
 
         # assigns +1 to the positions having a coverage value higher than the median.
         # assigns -1 to the positions having a coverage value lower than the median.
         matrix_01[matrix_01 >= 0] = 1
         matrix_01[matrix_01 < 0] = -1
 
-        return matrix_01
+        return matrix_01, median_vector
 
 
 def main():
@@ -130,9 +135,14 @@ def main():
     # execute the coverage function for each .bed file
     for bed_table_FP_path in bed_table_FP_path_list:
         bed_file_name = Path(os.path.basename(bed_table_FP_path)).stem
-        coverage_matrix_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_coverage.csv")
-        matrix_01_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_01.csv")
 
+        rand_string = ""
+        if addRand:
+            rand_string = "_rand"
+
+        coverage_matrix_csv_path = os.path.join(output_dir, bed_file_name + rand_string + "_matrix_coverage.csv")
+        matrix_01_csv_path = os.path.join(output_dir, bed_file_name + rand_string + "_matrix_01.csv")
+        pd_matrix_debug_path = os.path.join(output_dir, bed_file_name + rand_string + "_matrix_debug.csv")
         ###############################
         #### BED FILE FOOTPRINTS ######
         ###############################
@@ -143,11 +153,18 @@ def main():
 
         me = MatricesExtractor(bed_table_FP_reduced, genes)
         # extract the matrices
-        pd_matrix_coverage, matrix_01 = me.extract_matrices()
+        pd_matrix_coverage, matrix_01, median = me.extract_matrices()
 
+        # add median value to matrix coverage
+
+        pd_matrix_debug = pd.concat([matrix_01, pd_matrix_coverage], axis=1, sort=False)
+        pd_matrix_debug = pd_matrix_debug.sort_index(axis=1)
+        pd_matrix_debug.insert(0, "median", median, allow_duplicates=False)
         # Exports the dataFrames into CSV files
         matrix_01.to_csv(matrix_01_csv_path, index=True)
         pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
+        pd_matrix_debug.to_csv(pd_matrix_debug_path, index=True)
+        print("done")
 
 
 if __name__ == '__main__':
