@@ -21,6 +21,8 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 
+addRand = True
+
 
 class MatricesExtractor:
     def __init__(self, bed_table_FP_reduced, genes):
@@ -47,6 +49,11 @@ class MatricesExtractor:
 
         # extracts the matrix_coverage and matrix_01
         matrix_coverage = self.create_matrix_coverage(gen_list, gen_max_lenght)
+
+        if addRand:
+            rand_add = (np.random.random(np.shape(matrix_coverage)) * 0.001) + 0.001  # add small random values to avoid an artifact that comes out whan we compute the median of a vector having many zeros
+            matrix_coverage = matrix_coverage + rand_add
+
         matrix_01 = self.create_matrix_01(matrix_coverage)
 
         # converts the matrices to pandas dataFrame
@@ -84,15 +91,12 @@ class MatricesExtractor:
         # CREATING MATRIX 01
         # compare the profile heights at each nucleotide position (coverage) with its median value computed along the entire ORF
 
-        rand_add = (np.random.random(np.shape(matrix_coverage)) * 0.001) + 0.001  # add small random values to avoid an artifact that comes out whan we compute the median of a vector having many zeros
-        matrix_01 = matrix_coverage + rand_add
-
         # computes the median of the coverage values at each nucleotide.
-        median = np.nanmedian(matrix_01, axis=1) #Computes the median along the entire ORF, while ignoring NaNs.
+        median = np.nanmedian(matrix_coverage, axis=1) #Computes the median along the entire ORF, while ignoring NaNs.
         median = np.expand_dims(median, axis=1)
-        median = median.repeat(np.shape(matrix_01)[1], axis=1)
+        median = median.repeat(np.shape(matrix_coverage)[1], axis=1)
 
-        matrix_01 = np.subtract(matrix_01, median)  # element by element subtraction between arrays
+        matrix_01 = np.subtract(matrix_coverage, median)  # element by element subtraction between arrays
 
         # assigns +1 to the positions having a coverage value higher than the median.
         # assigns -1 to the positions having a coverage value lower than the median.
@@ -105,7 +109,7 @@ class MatricesExtractor:
 def main():
     # I/O directories
     input_data_dir = "input_data/"
-    output_data_dir = "output_matrix_sample/"
+    output_data_dir = "output_matrix/"
 
     working_dir = os.getcwd()  # Sets the working directory
 
