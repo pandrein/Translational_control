@@ -21,7 +21,8 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 
-addRand = True
+m_addRand = True
+m_areReadsRandomized = True
 
 
 class MatricesExtractor:
@@ -29,8 +30,20 @@ class MatricesExtractor:
         self.bed_table_FP_reduced = bed_table_FP_reduced
         self.genes = genes
 
+    def randomize_reads(self, bed_table):
+        readsLength = bed_table["End"] - bed_table["Start"]
+        randomStartInterval = bed_table["GeneLength"] - readsLength
+        random_vector = np.random.rand(len(readsLength))
+        randomStarts = (random_vector * randomStartInterval).astype(int)
+        randomEnds = randomStarts + readsLength
+        # insert the random values
+        bed_table_rand = bed_table.iloc[:, 2:4]
+        bed_table_rand.insert(0, "Start", randomStarts)
+        bed_table_rand.insert(1, "End", randomEnds)
+        return bed_table_rand
+
     # defining function to be applied to every bed file
-    def extract_matrices(self):
+    def extract_matrices(self, addRand=False, areReadsRandomized=False):
 
         ######################
         #### FP READS ########
@@ -44,6 +57,9 @@ class MatricesExtractor:
         gen_max_lenght = table_FP_Geneslengths["GeneLength"].max()
 
         bed_table_FP_reduced = self.bed_table_FP_reduced.join(table_FP_Geneslengths.set_index('GeneID'), on='Chromosome').set_index("Chromosome")
+
+        if areReadsRandomized:
+            bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)
 
         gen_list = [group.to_numpy() for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]
 
@@ -92,7 +108,7 @@ class MatricesExtractor:
         # compare the profile heights at each nucleotide position (coverage) with its median value computed along the entire ORF
 
         # computes the median of the coverage values at each nucleotide.
-        median = np.nanmedian(matrix_coverage, axis=1) #Computes the median along the entire ORF, while ignoring NaNs.
+        median = np.nanmedian(matrix_coverage, axis=1)  # Computes the median along the entire ORF, while ignoring NaNs.
         median = np.expand_dims(median, axis=1)
         median = median.repeat(np.shape(matrix_coverage)[1], axis=1)
 
@@ -147,7 +163,7 @@ def main():
 
         me = MatricesExtractor(bed_table_FP_reduced, genes)
         # extract the matrices
-        pd_matrix_coverage, matrix_01 = me.extract_matrices()
+        pd_matrix_coverage, matrix_01 = me.extract_matrices(addRand=m_addRand, areReadsRandomized=m_areReadsRandomized)
 
         # Exports the dataFrames into CSV files
         matrix_01.to_csv(matrix_01_csv_path, index=True)
