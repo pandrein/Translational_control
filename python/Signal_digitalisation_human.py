@@ -6,20 +6,14 @@
 
 # Uploads the needed modules -----------
 
+import os
+from os import listdir
+from os.path import isfile
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pyranges as pr
-import os
-import sys
-from tqdm import trange
-import time
-from joblib import Parallel, delayed
-import multiprocessing
-import random
-import numpy.ma as ma
-from os import listdir
-from os.path import isfile, join
-from pathlib import Path
 
 
 class MatricesExtractor:
@@ -33,7 +27,6 @@ class MatricesExtractor:
         ######################
         #### FP READS ########
         ######################
-
         # creates a table joining the list of genes present in bed_table_FP_reduced and the number of reads mapping on each of them
 
         table_FP = self.bed_table_FP_reduced["Chromosome"].value_counts().sort_index().rename_axis('GeneID').reset_index(name='ReadsCounts')
@@ -44,21 +37,21 @@ class MatricesExtractor:
         bed_table_FP_reduced = self.bed_table_FP_reduced.join(table_FP_Geneslengths.set_index('GeneID'), on='Chromosome').set_index("Chromosome")
 
         gen_list = [group.to_numpy() for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]
-        gene_name_list = [name_of_the_group for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]#added
+        gene_name_list = [name_of_the_group for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]  # added
         # extracts the matrix_coverage and matrix_01
         matrix_coverage = self.create_matrix_coverage(gen_list, gen_max_lenght)
         matrix_01 = self.create_matrix_01(matrix_coverage)
-
         # converts the matrices to pandas dataFrame
         # gene_name_list = bed_table_FP_reduced.index.unique()
-        pd_matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
+        matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
 
-        return pd_matrix_coverage, matrix_01
+        return matrix_coverage, matrix_01
 
     def create_matrix_coverage(self, gen_list, gen_max_lenght):
         # CREATING MATRIX COVERAGE
-        matrix_coverage = []
+        matrix_coverage = np.empty([len(gen_list), gen_max_lenght])
+        gene_idx = 0
         for gene in gen_list:
             start, counts_start = np.unique(gene[:, 0], return_counts=True)
             counts_start_dict = dict(zip(start, counts_start))
@@ -74,25 +67,31 @@ class MatricesExtractor:
                 if i in counts_end_dict:
                     val -= counts_end_dict[i]
                 vector_coverage[i] = val
-
-            matrix_coverage.append(vector_coverage)
+            matrix_coverage[gene_idx, :] = vector_coverage
+            gene_idx += 1
+            # matrix_coverage.append(vector_coverage)
 
         return matrix_coverage
 
-    def create_matrix_01(self, matrix_coverage):
-
-        # CREATING MATRIX 01
-        # compare the profile heights at each nucleotide position (coverage) with its median value computed along the entire ORF
-
+    def add_rand_to_matrix(self, matrix_coverage):
         rand_add = (np.random.random(np.shape(matrix_coverage)) * 0.001) + 0.001  # add small random values to avoid an artifact that comes out whan we compute the median of a vector having many zeros
         matrix_01 = matrix_coverage + rand_add
+        return matrix_01
 
-        # computes the median of the coverage values at each nucleotide.
-        median = np.nanmedian(matrix_01, axis=1) #Computes the median along the entire ORF, while ignoring NaNs.
+    def subtract_median_to_matrix(self, matrix_01, median):
         median = np.expand_dims(median, axis=1)
         median = median.repeat(np.shape(matrix_01)[1], axis=1)
-
         matrix_01 = np.subtract(matrix_01, median)  # element by element subtraction between arrays
+        return matrix_01
+
+    def create_matrix_01(self, matrix_coverage):
+        # CREATING MATRIX 01
+        # compare the profile heights at each nucleotide position (coverage) with its median value computed along the entire ORF
+        matrix_01 = self.add_rand_to_matrix(matrix_coverage)
+
+        # computes the median of the coverage values at each nucleotide.
+        median = np.nanmedian(matrix_01, axis=1)  # Computes the median along the entire ORF, while ignoring NaNs.
+        matrix_01 = self.subtract_median_to_matrix(matrix_01, median)
 
         # assigns +1 to the positions having a coverage value higher than the median.
         # assigns -1 to the positions having a coverage value lower than the median.
@@ -119,11 +118,11 @@ def main():
     # DATA INPUT =========================================
     # genes_lengths_path = os.path.join(input_dir,"gene_lengths.csv")
     genes_lengths_path = os.path.join(working_dir, "CDShumanGenesLengths.txt")  # path to upload the file containing each gene's ID and the correspondent gene length
-    #genes = pd.read_csv(genes_lengths_path)
-    genes= pd.read_csv(genes_lengths_path, sep= "\t", header=None)
+    # genes = pd.read_csv(genes_lengths_path)
+    genes = pd.read_csv(genes_lengths_path, sep="\t", header=None)
     # removes a not useful column from the "genes" dataframe
     # renames column from the "genes" dataframe
-    #genes = genes.drop(genes.columns[0], axis=1)
+    # genes = genes.drop(genes.columns[0], axis=1)
     genes = genes.rename(columns={genes.columns[0]: "GeneID", genes.columns[1]: "GeneLength"})
 
     bed_table_FP_path_list = [os.path.abspath(os.path.join(input_dir, f)) for f in listdir(input_dir) if isfile(os.path.join(input_dir, f)) if f.endswith(".bed")]  # list all the file names in input_dir
@@ -131,8 +130,10 @@ def main():
     # execute the coverage function for each .bed file
     for bed_table_FP_path in bed_table_FP_path_list:
         bed_file_name = Path(os.path.basename(bed_table_FP_path)).stem
-        coverage_matrix_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_coverage.csv")
-        matrix_01_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_01.csv")
+        # coverage_matrix_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_coverage.csv")
+        # matrix_01_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_01.csv")
+        coverage_matrix_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_coverage.parquet")
+        matrix_01_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_01.parquet")
 
         ###############################
         #### BED FILE FOOTPRINTS ######
@@ -146,9 +147,15 @@ def main():
         # extract the matrices
         pd_matrix_coverage, matrix_01 = me.extract_matrices()
 
+        matrix_01.columns = matrix_01.columns.astype(str)
+        pd_matrix_coverage.columns = pd_matrix_coverage.columns.astype(str)
+        # insert columns with geneid
+        # df['index1'] = df.index
         # Exports the dataFrames into CSV files
-        matrix_01.to_csv(matrix_01_csv_path, index=True)
-        pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
+        matrix_01.to_parquet(matrix_01_csv_path, index=True)
+        pd_matrix_coverage.to_parquet(coverage_matrix_csv_path, index=True)
+        # matrix_01.to_csv(matrix_01_csv_path, index=True)
+        # pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
 
 
 if __name__ == '__main__':
