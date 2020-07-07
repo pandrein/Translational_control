@@ -21,8 +21,20 @@ class MatricesExtractor:
         self.bed_table_FP_reduced = bed_table_FP_reduced
         self.genes = genes
 
+    def randomize_reads(self, bed_table):
+        readsLength = bed_table["End"] - bed_table["Start"]
+        randomStartInterval = bed_table["GeneLength"] - readsLength
+        random_vector = np.random.rand(len(readsLength))
+        randomStarts = (random_vector * randomStartInterval).astype(int)
+        randomEnds = randomStarts + readsLength
+        # insert the random values
+        bed_table_rand = bed_table.iloc[:, 2:4]
+        bed_table_rand.insert(0, "Start", randomStarts)
+        bed_table_rand.insert(1, "End", randomEnds)
+        return bed_table_rand
+
     # defining function to be applied to every bed file
-    def extract_matrices(self):
+    def extract_matrices(self,areReadsRandomized=False):
 
         ######################
         #### FP READS ########
@@ -35,6 +47,8 @@ class MatricesExtractor:
         gen_max_lenght = table_FP_Geneslengths["GeneLength"].max()
 
         bed_table_FP_reduced = self.bed_table_FP_reduced.join(table_FP_Geneslengths.set_index('GeneID'), on='Chromosome').set_index("Chromosome")
+        if areReadsRandomized:
+            bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)
 
         gen_list = [group.to_numpy() for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]
         gene_name_list = [name_of_the_group for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]  # added

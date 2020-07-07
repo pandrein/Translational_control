@@ -19,6 +19,11 @@ class InputFileManager:
         genes = genes.rename(columns={genes.columns[0]: "GeneID", genes.columns[1]: "GeneLength"})
         return genes
 
+    def get_genes_human(self):
+        genes = pd.read_csv(self.gene_lengths_path, sep="\t", header=None)
+        genes = genes.rename(columns={genes.columns[0]: "GeneID", genes.columns[1]: "GeneLength"})
+        return genes
+
     def get_bed_files(self):
         bed_table_FP_path_list = [os.path.abspath(os.path.join(self.input_bed_files_dir, f)) for f in listdir(self.input_bed_files_dir) if isfile(os.path.join(self.input_bed_files_dir, f)) if f.endswith(".bed")]  # list all the file names in input_dir
         bed_table_FPs = [{"bed_file": pr.read_bed(f, as_df=True), "bed_file_name": Path(os.path.basename(f)).stem} for f in bed_table_FP_path_list]
