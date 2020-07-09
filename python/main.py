@@ -9,6 +9,11 @@ from pathlib import Path
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from joblib import Parallel, delayed
+import multiprocessing
+import time
+
+num_cores = multiprocessing.cpu_count()
 
 # I/O directories
 input_dir = os.path.join(os.getcwd(), "check_reduced/")  # get the path to the data input directory
@@ -34,6 +39,15 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
         # matrix_01.to_csv(matrix_01_csv_path, index=True)
         # pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
     return matrix_01_list
+
+
+def signal_digitalisation_parallel(genes, bed_files_dict, areReadsRandomized):
+    bed_file = bed_files_dict["bed_file"]
+    bed_file_name = bed_files_dict["bed_file_name"]
+    me = MatricesExtractor(bed_file, genes)
+    # extract the matrices
+    pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=areReadsRandomized)
+    return {'matrix': matrix_01, 'file_name': bed_file_name}
 
 
 def compute_real_match_scores(genes, bed_files_dicts):
@@ -66,6 +80,7 @@ def compute_real_match_scores(genes, bed_files_dicts):
 
 
 def compute_fake_match_scores(genes, bed_files_dicts, gene_list):
+    # matrix_01_list = Parallel(n_jobs=2, prefer="threads")(delayed(signal_digitalisation_parallel)(genes, bed_files_dict, areReadsRandomized=True) for bed_files_dict in bed_files_dicts)
     matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=True)
 
     # lists of pair of matrices
@@ -86,25 +101,41 @@ def main():
     genes = ifm.get_genes_human()
     bed_files_dicts = ifm.get_bed_files()
     gene_list, match_scores = compute_real_match_scores(genes, bed_files_dicts)
-    print("generated real match scores")
+
     # compute fake match scores
     fake_match_scores = compute_fake_match_scores(genes, bed_files_dicts, gene_list)
-
+    # create a histogram for each pair and for each gene
     match_scores_hist = {}
     for fake_match_score in fake_match_scores:
-        match_scores_hist[fake_match_score['pair_name']] = fake_match_score['match_score'].to_list()
+        # fake_match_score contains the scores of one pair
+        pair_name = fake_match_score['pair_name']
+        match_scores = fake_match_score['match_score']
+        gene_hist = {}
+        for gene, match_score in match_scores.items():
+            # print(f"Index : {gene}, Value : {match_score}")
+            gene_hist[gene] = [match_score]
 
-    for i in range(0, 10):
+        match_scores_hist[pair_name] = gene_hist
+
+    for i in range(0, 1500):
+        start = time.process_time()
         fake_match_scores = compute_fake_match_scores(genes, bed_files_dicts, gene_list)
         for fake_match_score in fake_match_scores:
-            match_scores_hist[fake_match_score['pair_name']] = match_scores_hist[fake_match_score['pair_name']] + fake_match_score['match_score'].to_list()
+            pair_name = fake_match_score['pair_name']
+            match_scores = fake_match_score['match_score']
+            for gene, match_score in match_scores.items():
+                # print(f"Index : {gene}, Value : {match_score}")
+                match_scores_hist[pair_name][gene].append(match_score)  # = [match_score]
+        print(time.process_time() - start)
 
-    for key in match_scores_hist:
-        plt.hist(match_scores_hist[key], bins=100)
-        plt.xlabel('Score')
-        plt.ylabel('Frequency')
-        plt.title(key)
-        plt.show()
+    for pair_name in match_scores_hist:
+        for gene in match_scores_hist[pair_name]:
+            gene_hist = match_scores_hist[pair_name][gene]
+            plt.hist(gene_hist, bins=50)
+            plt.xlabel('Score')
+            plt.ylabel('Frequency')
+            plt.title("dataset_pair:" + pair_name + " gene:" + gene)
+            plt.show()
 
 
 if __name__ == '__main__':
