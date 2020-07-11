@@ -1,3 +1,19 @@
+"""
+Lo script inizialmente calcola gli score reali esattamente come prima, poi quando ha finito fa i confronti tra matrici random.
+Per le matrici random ho cambiato l’ordine delle operazioni in maniera che possono essere fatti più confronti contemporaneamente per velocizzare il calcolo.
+Per prima cosa raggruppo i file bed in coppie, in questo modo tutto il calcolo può essere fatto separatamente per ognuna delle coppie.
+Data una coppia di file bed parte un processo separato che applica la funzione compare_pair_n_times.
+La funzione calcola le matrici 01 (posizionando le reads random) per ognuno dei due file bed della coppia, poi confronta le due matrici 01 ottenute e trova i match score.
+Questa operazione viene ripetuta un numero di volte dato dalla variabile num_comparison.
+Quindi per esempio se num_comparison è 10^4, la funzione compare_pair_n_times farà 10^4 confronti tra coppie di matrici 01 con reads random.
+Questa operazione viene ripetuta per ogni coppia di file bed.
+
+La cosa interessante è questa. Dato che i calcoli per ogni coppia di file bed sono indipendenti, possono essere mandati in esecuzione su un processore diverso.
+Quindi se hai 10 file bed, le possibili coppie sono 45, in teoria ognuno dei 45 processi (ognuno dei processi esegue num_comparison confronti in sequenza) possono essere eseguiti contemporaneamente ma su processori diversi.
+In questo modo ci mette poco più che se la coppia fosse solo una. Questo se non finisce la memoria, cosa che sulla maggior parte dei computer è molto probabile, spero non per il computer di Cambridge...
+Su un server come quello di Cambridge potresti provare a mettere  un numero di task = al numero di coppie (es 45 task se confronti 10 file) e num_comparison = 10^4 se non va out of memory.
+"""
+
 import multiprocessing
 import os
 import time
@@ -9,6 +25,7 @@ from Comparison_digital_profiles_human import compare_pair
 from Signal_digitalisation_human import MatricesExtractor
 from utils import InputFileManager
 from utils import create_dir_if_not_exist
+import sys
 
 # num_cores = multiprocessing.cpu_count()
 
