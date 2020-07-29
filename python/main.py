@@ -26,6 +26,8 @@ from Signal_digitalisation_human import MatricesExtractor
 from utils import InputFileManager
 from utils import create_dir_if_not_exist
 import sys
+import numpy as np
+import scipy.stats as st
 
 # num_cores = multiprocessing.cpu_count()
 
@@ -37,7 +39,7 @@ histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to 
 
 create_dir_if_not_exist([input_dir, output_dir, histogram_plot_path])
 
-num_comparison = 5  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 2  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 
 
 def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
@@ -82,8 +84,9 @@ def compute_real_match_scores(genes, bed_files_dicts):
     match_scores = []
     for pair in pairs:
         match_score, pair_names = compare_pair(pair, genes.set_index('GeneID'), gene_list)
-        pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem + ".csv"
-        match_scores.append(match_score)
+        pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
+        match_scores.append({"match_score": match_score, "pair_name": pair_names})
+        pair_names = pair_names + ".csv"
         match_score.to_csv(os.path.join(output_dir, pair_names), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
     return gene_list, match_scores
@@ -112,7 +115,7 @@ def main():
     ifm = InputFileManager(genes_lengths_path, input_dir)
     genes = ifm.get_genes_human()
     bed_files_dicts = ifm.get_bed_files()
-    gene_list, match_scores = compute_real_match_scores(genes, bed_files_dicts)
+    gene_list, match_scores_real = compute_real_match_scores(genes, bed_files_dicts)
 
     # create pairs of bed files
     bed_files_pairs = [list(f) for f in combinations(bed_files_dicts, 2)]
@@ -144,24 +147,56 @@ def main():
         for fake_match_score in fake_match_scores:
             # fake_match_score contains the scores of one pair
             pair_name = fake_match_score['pair_name']
-            match_scores = fake_match_score['match_score']
+            match_scores_fake = fake_match_score['match_score']
             gene_hist = {}
-            for gene, match_score in match_scores.items():
+            for gene, match_score in match_scores_fake.items():
                 gene_hist[gene] = [match_score]
 
             if pair_name in match_scores_hist:
-                for gene, match_score in match_scores.items():
+                for gene, match_score in match_scores_fake.items():
                     match_scores_hist[pair_name][gene].append(match_score)  # = [match_score]
             else:
                 match_scores_hist[pair_name] = gene_hist
-    i = 0
+    # i = 0
     for pair_name in match_scores_hist:
         for gene in match_scores_hist[pair_name]:
             gene_hist = pd.Series(match_scores_hist[pair_name][gene])
-            gene_hist.plot.hist(grid=True, bins=20, rwidth=0.9, color='#607c8e')
-            plt.savefig(histogram_plot_path+"dataset_pair:" + pair_name + " gene:" + gene + ".png")
-            plt.figure(i) #NOTA: fatto solo per evitare di sovrascrivere i plot, credo ci siano modi migliori...
-            i += 1
+            hist_mean = np.mean(gene_hist)
+            hist_std = np.std(gene_hist)
+
+            for match_score_real in match_scores_real:
+                pair_name_real = match_score_real["pair_name"]
+                if pair_name_real == pair_name:
+                    real_score = match_score_real["match_score"][gene]
+                    z_score = (real_score - hist_mean)/hist_std
+                    # print(hist_mean)
+                    # print(hist_std)
+                    print("z_score")
+                    print (z_score)
+                    pvalue = st.norm.cdf(z_score)
+                    print("score")
+                    print (real_score)
+                    print("pvalue")
+                    print (pvalue)
+                    # print(match_score_real["match_score"][gene])  # .loc["ENST00000672916.1"])
+                    # print(pair_name)
+                    # print(pair_name_real)
+                    # sys.exit()
+
+            # print(match_scores_real[0]["pair_name"])
+            # print(match_scores_real[0]["match_score"].loc["ENST00000672916.1"])
+            # print(match_scores_real)
+
+            # print(match_scores_real.loc[gene])
+            # print(pair_name)
+            # print(gene)
+            # print(hist_std)
+            # print(hist_mean)
+            # sys.exit()
+            # gene_hist.plot.hist(grid=True, bins=20, rwidth=0.9, color='#607c8e')
+            # plt.savefig(histogram_plot_path+"dataset_pair:" + pair_name + " gene:" + gene + ".png")
+            # plt.figure(i) #NOTA: fatto solo per evitare di sovrascrivere i plot, credo ci siano modi migliori...
+            # i += 1
 
     # NOTA: ci sarebbe da fare i confronti tra i reali e gli istogrammi creati però non ho ben capito come fare
 
