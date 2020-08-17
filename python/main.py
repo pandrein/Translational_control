@@ -28,18 +28,22 @@ from utils import create_dir_if_not_exist
 import sys
 import numpy as np
 import scipy.stats as st
+from statsmodels.stats.multitest import multipletests
 
-# num_cores = multiprocessing.cpu_count()
+num_cores = multiprocessing.cpu_count()
+num_task = num_cores
 
 # I/O directories
 input_dir = os.path.join(os.getcwd(), "check_reduced/")  # get the path to the data input directory
-output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/")  # Sets the directory where all the saved outputs will be stored
-genes_lengths_path = os.path.join(os.getcwd(), "CDShumanGenesLengths.txt")  # path to upload the file containing each gene's ID and the correspondent gene length
+match_scores_output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/")  # Sets the directory where all the saved outputs will be stored
+reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/reproducible_sequence/")  # Sets the directory where all the saved outputs will be stored
+genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
 
-create_dir_if_not_exist([input_dir, output_dir, histogram_plot_path])
+create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path,reproducible_sequence_output_dir])
 
-num_comparison = 2  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 3  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+FDR = 0.01
 
 
 def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
@@ -53,8 +57,8 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
         matrix_01_list.append({'matrix': matrix_01, 'file_name': bed_file_name})
 
         # NOTA: per velocizzare le operazioni per ora ho tolto il salvataggio
-        # coverage_matrix_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_coverage.csv")
-        # matrix_01_csv_path = os.path.join(output_dir, bed_file_name + "_matrix_01.csv")
+        # coverage_matrix_csv_path = os.path.join(match_scores_output_dir, bed_file_name + "_matrix_coverage.csv")
+        # matrix_01_csv_path = os.path.join(match_scores_output_dir, bed_file_name + "_matrix_01.csv")
 
         # # Exports the dataFrames into CSV files
         # matrix_01.to_csv(matrix_01_csv_path, index=True)
@@ -62,6 +66,7 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
     return matrix_01_list
 
 
+# FIX ME al momento esegue la parte modificata comparison_digital_profiles_human, verificare che sia corretta. Per e.coli provare la comparison_digital_profiles.
 def compute_real_match_scores(genes, bed_files_dicts):
     matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=False)
 
@@ -82,14 +87,16 @@ def compute_real_match_scores(genes, bed_files_dicts):
 
     # saves match scores
     match_scores = []
+    pair_names_list = []
     for pair in pairs:
         match_score, pair_names = compare_pair(pair, genes.set_index('GeneID'), gene_list)
         pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
         match_scores.append({"match_score": match_score, "pair_name": pair_names})
+        pair_names_list.append(pair_names)
         pair_names = pair_names + ".csv"
-        match_score.to_csv(os.path.join(output_dir, pair_names), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+        match_score.to_csv(os.path.join(match_scores_output_dir, pair_names), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
-    return gene_list, match_scores
+    return gene_list, match_scores, pair_names_list, matrix_01_list
 
 
 def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
@@ -111,18 +118,37 @@ def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
     return match_scores
 
 
+def extract_reproducible_sequences(reproducible_genes, matrix_01_list):
+    # for each matrix_01 select only the reproducible genes
+    reproducible_genes_tables = [matrix_01_struct['matrix'][matrix_01_struct['matrix'].index.isin(reproducible_genes)] for matrix_01_struct in matrix_01_list]
+    # select the elements that are one for all the sequences
+    sequences_ones_mask = [(f == 1).to_numpy() for f in reproducible_genes_tables]  # FIX ME per fare il confronto qui passo a numpy. Andrebbe verificato che i genei confrontati siano quelli giusti
+    sequences_ones_mask = np.stack(sequences_ones_mask)
+    all_ones = np.all(sequences_ones_mask, axis=0)
+    # select the elements that are minus one for all the sequences
+    sequences_minus_ones_mask = [(f == -1).to_numpy() for f in reproducible_genes_tables]  # FIX ME verifica se si può valutare la condizione di uguaglianza con -1 e 1 in un passo solo
+    sequences_minus_ones_mask = np.stack(sequences_minus_ones_mask)
+    all_minus_ones = np.all(sequences_minus_ones_mask, axis=0)  # FIX ME verificare il comportamento con i nan
+    # get a mask with all the elements that are one and minus one for all the sequences
+    reproducible_sequence_mask = np.stack([all_ones, all_minus_ones])
+    reproducible_sequence_mask = np.any(reproducible_sequence_mask, axis=0)
+    return reproducible_sequence_mask, reproducible_genes_tables[0].to_numpy()
+
+
 def main():
+    print("num of core available: " + str(num_cores))
+
     ifm = InputFileManager(genes_lengths_path, input_dir)
-    genes = ifm.get_genes_human()
+    genes = ifm.get_genes()
     bed_files_dicts = ifm.get_bed_files()
-    gene_list, match_scores_real = compute_real_match_scores(genes, bed_files_dicts)
+    gene_list, match_scores_real, pair_names_list, matrix_01_list = compute_real_match_scores(genes, bed_files_dicts)
 
     # create pairs of bed files
     bed_files_pairs = [list(f) for f in combinations(bed_files_dicts, 2)]
 
     match_scores_list = []
     # # randomize and digitalise each pair
-    p = multiprocessing.Pool(processes=1)
+    p = multiprocessing.Pool(processes=num_cores)
     # NOTA: processes rappresenta il numero di processi in parallelo che eseguono i calcoli.
     # Idealmente ce ne vorrebbe uno per ogni coppia di file bed (es. con 4 file l'ideale sarebbero 6 processi)
     # La cosa migliore è usare il numero maggiore di processi che possono stare in memoria
@@ -140,8 +166,7 @@ def main():
     print("Complete")
     print('total time (s)= ' + str(end - start))
 
-    print(len(match_scores_list[0]))
-
+    # compute the match score histograms for the random comparisons
     match_scores_hist = {}
     for fake_match_scores in match_scores_list:
         for fake_match_score in fake_match_scores:
@@ -157,7 +182,9 @@ def main():
                     match_scores_hist[pair_name][gene].append(match_score)  # = [match_score]
             else:
                 match_scores_hist[pair_name] = gene_hist
-    # i = 0
+    p_value_matrix = pd.DataFrame(index=gene_list, columns=pair_names_list)
+
+    # extract pvalues for each gene and dataset pair
     for pair_name in match_scores_hist:
         for gene in match_scores_hist[pair_name]:
             gene_hist = pd.Series(match_scores_hist[pair_name][gene])
@@ -168,38 +195,29 @@ def main():
                 pair_name_real = match_score_real["pair_name"]
                 if pair_name_real == pair_name:
                     real_score = match_score_real["match_score"][gene]
-                    z_score = (real_score - hist_mean)/hist_std
-                    # print(hist_mean)
-                    # print(hist_std)
-                    print("z_score")
-                    print (z_score)
-                    pvalue = st.norm.cdf(z_score)
-                    print("score")
-                    print (real_score)
-                    print("pvalue")
-                    print (pvalue)
-                    # print(match_score_real["match_score"][gene])  # .loc["ENST00000672916.1"])
-                    # print(pair_name)
-                    # print(pair_name_real)
-                    # sys.exit()
-
-            # print(match_scores_real[0]["pair_name"])
-            # print(match_scores_real[0]["match_score"].loc["ENST00000672916.1"])
-            # print(match_scores_real)
-
-            # print(match_scores_real.loc[gene])
-            # print(pair_name)
-            # print(gene)
-            # print(hist_std)
-            # print(hist_mean)
-            # sys.exit()
+                    z_score = (real_score - hist_mean) / hist_std
+                    pvalue = st.norm.sf(abs(z_score))
+                    p_value_matrix[pair_name][gene] = pvalue
+                    # p_value_matrix[gene][pair_name] = pvalue
             # gene_hist.plot.hist(grid=True, bins=20, rwidth=0.9, color='#607c8e')
             # plt.savefig(histogram_plot_path+"dataset_pair:" + pair_name + " gene:" + gene + ".png")
             # plt.figure(i) #NOTA: fatto solo per evitare di sovrascrivere i plot, credo ci siano modi migliori...
             # i += 1
 
-    # NOTA: ci sarebbe da fare i confronti tra i reali e gli istogrammi creati però non ho ben capito come fare
+    reproducible_genes = []
+    for gene, pvalue_row in p_value_matrix.iterrows():
+        pvalue_row = pvalue_row.to_numpy()
+        y = multipletests(pvals=pvalue_row, alpha=FDR, method="fdr_bh")
+        number_of_significative_values = len(y[1][np.where(y[1] < FDR)])
+        # if all the pvalues are below the threshold for each dataset then the gene can be considered reproducible
+        if number_of_significative_values == len(pair_names_list):
+            reproducible_genes.append(gene)
 
+    reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
+    # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
+    first_matrix_01_with_only_reproducible_genes[~reproducible_sequence_mask] = 0
+    reproducible_sequence = pd.DataFrame(first_matrix_01_with_only_reproducible_genes, index=reproducible_genes)
+    reproducible_sequence.to_csv(os.path.join(reproducible_sequence_output_dir, "reproducible_sequence.csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
 if __name__ == '__main__':
     main()
