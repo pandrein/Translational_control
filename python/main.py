@@ -42,7 +42,7 @@ histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to 
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path,reproducible_sequence_output_dir])
 
-num_comparison = 4  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 10  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 FDR = 0.01
 
 
@@ -109,7 +109,7 @@ def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
     match_scores = []
     for i in range(n):
         print("fake_comp "+str(i))
-        start = time.time()
+        # start = time.time()
         matrix_01_pair = []
         for bed_files_dict in bed_files_pair:
             bed_file = bed_files_dict["bed_file"]
@@ -118,15 +118,15 @@ def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
             # extract the matrices
             pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=True)
             matrix_01_pair.append({'matrix': matrix_01, 'file_name': bed_file_name})
-        end = time.time()
-        print('01 completed in ' + str(end - start) + " sec")
+        # end = time.time()
+        # print('01 completed in ' + str(end - start) + " sec")
 
         start = time.time()
         match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)
         pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
         match_scores.append({'pair_name': pair_names, 'match_score': match_score})
-        end = time.time()
-        print('comparisons completed in ' + str(end - start) + " sec")
+        # end = time.time()
+        # print('comparisons completed in ' + str(end - start) + " sec")
     return match_scores
 
 
@@ -160,7 +160,7 @@ def main():
 
     match_scores_list = []
     # # randomize and digitalise each pair
-    p = multiprocessing.Pool(processes=num_cores)
+    p = multiprocessing.Pool(processes=num_task)
     # NOTA: processes rappresenta il numero di processi in parallelo che eseguono i calcoli.
     # Idealmente ce ne vorrebbe uno per ogni coppia di file bed (es. con 4 file l'ideale sarebbero 6 processi)
     # La cosa migliore è usare il numero maggiore di processi che possono stare in memoria
