@@ -68,7 +68,9 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
 
 # FIX ME al momento esegue la parte modificata comparison_digital_profiles_human, verificare che sia corretta. Per e.coli provare la comparison_digital_profiles.
 def compute_real_match_scores(genes, bed_files_dicts):
+    print ("start real matrix digitalization...")
     matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=False)
+    print("digitalization complete...")
 
     # gets the gene list for each matrix
     gene_lists = [pd.DataFrame(f['matrix'].index, columns={"GeneID"}) for f in matrix_01_list]
@@ -85,16 +87,20 @@ def compute_real_match_scores(genes, bed_files_dicts):
     # lists of pair of matrices
     pairs = [list(f) for f in combinations(matrix_01_list, 2)]
 
+    print ("start pair comparison...")
     # saves match scores
     match_scores = []
     pair_names_list = []
     for pair in pairs:
+        print ("compare " + pair[0]['file_name'] + " and " + pair[1]['file_name'])
         match_score, pair_names = compare_pair(pair, genes.set_index('GeneID'), gene_list)
         pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
         match_scores.append({"match_score": match_score, "pair_name": pair_names})
         pair_names_list.append(pair_names)
         pair_names = pair_names + ".csv"
         match_score.to_csv(os.path.join(match_scores_output_dir, pair_names), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+        print("done")
+    print("real comparison complete")
 
     return gene_list, match_scores, pair_names_list, matrix_01_list
 
@@ -152,6 +158,7 @@ def main():
     # NOTA: processes rappresenta il numero di processi in parallelo che eseguono i calcoli.
     # Idealmente ce ne vorrebbe uno per ogni coppia di file bed (es. con 4 file l'ideale sarebbero 6 processi)
     # La cosa migliore è usare il numero maggiore di processi che possono stare in memoria
+    print ("start fake matrix comparisons")
     start = time.time()
     res = []
     for bed_files_pair in bed_files_pairs:
@@ -163,8 +170,7 @@ def main():
     for i in res:
         match_scores_list.append(i.get())
     end = time.time()
-    print("Complete")
-    print('total time (s)= ' + str(end - start))
+    print('fake matrix comparisons completed in ' + str(end - start) + "seconds")
 
     # compute the match score histograms for the random comparisons
     match_scores_hist = {}
