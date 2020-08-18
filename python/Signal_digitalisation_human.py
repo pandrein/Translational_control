@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyranges as pr
-
+# import cupy as cp
 
 class MatricesExtractor:
     def __init__(self, bed_table_FP_reduced, genes):
@@ -65,6 +65,9 @@ class MatricesExtractor:
     def create_matrix_coverage(self, gen_list, gen_max_lenght):
         # CREATING MATRIX COVERAGE
         matrix_coverage = np.empty([len(gen_list), gen_max_lenght])
+        # matrix_coverage = cp.array(matrix_coverage)
+        # matrix_coverage = gpu.garray(matrix_coverage)
+        # gen_list = gpu.garray(gen_list)
         gene_idx = 0
         for gene in gen_list:
             start, counts_start = np.unique(gene[:, 0], return_counts=True)
