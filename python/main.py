@@ -42,7 +42,7 @@ histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to 
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir])
 
-num_comparison = 12  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 18  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 FDR = 0.01
 
 
@@ -128,10 +128,6 @@ def compare_pair_n_times(parallel_arguments):
     # extract a pair of bed files
     match_scores = []
 
-    # print (n)
-    # print (int(np.floor(n/num_task)))
-    # print (n%num_task)
-
     matrices_extractors = []
     for bed_files_dict in bed_files_pair:  # FIX ME creazione delle classi estrattori a monte, verificare correttezza
         bed_file = bed_files_dict["bed_file"]
@@ -139,9 +135,8 @@ def compare_pair_n_times(parallel_arguments):
         me = MatricesExtractor(bed_file, genes)
         matrices_extractors.append({"me": me, "bed_file_name": bed_file_name})
 
-
     arguments = matrices_extractors, genes, gene_list
-    num_parallel_comparison = int(np.floor(n/num_task))
+    num_parallel_comparison = int(np.floor(n / num_task))
     for comp in range(num_parallel_comparison):
         pool = multiprocessing.Pool(processes=num_task)
         res = []
@@ -152,6 +147,15 @@ def compare_pair_n_times(parallel_arguments):
         for i in res:
             match_scores.append(i.get())
 
+    pool = multiprocessing.Pool(processes=n % num_task)
+
+    res = []
+    for comp in range(n % num_task):
+        res.append(pool.apply_async(random_comparison, [arguments]))
+    pool.close()
+    pool.join()
+    for i in res:
+        match_scores.append(i.get())
 
     return match_scores
 
@@ -213,7 +217,7 @@ def main():
 
     # create pairs of bed files
     bed_files_pairs = [list(f) for f in combinations(bed_files_dicts, 2)]
-
+    print("start fake matrix comparisons...")
     start = time.time()
     match_scores_list = []
     parallel_arguments = [[bed_files_pair, genes, gene_list, num_comparison] for bed_files_pair in bed_files_pairs]
