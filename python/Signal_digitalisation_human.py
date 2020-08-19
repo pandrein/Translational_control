@@ -47,13 +47,13 @@ class MatricesExtractor:
         #### FP READS ########
         ######################
         # creates a table joining the list of genes present in bed_table_FP_reduced and the number of reads mapping on each of them
-        start = time.time()
+        # start = time.time()
         bed_table_FP_reduced = self.bed_table_FP_reduced
         if areReadsRandomized:
             bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)
-        end = time.time()
-        print('randomization completed in ' + str(end - start) + " sec")
-        start = time.time()
+        # end = time.time()
+        # print('randomization completed in ' + str(end - start) + " sec")
+        # start = time.time()
         gen_list = []
         gene_name_list = []
         for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome"):
@@ -61,24 +61,24 @@ class MatricesExtractor:
             gene_name_list.append(name_of_the_group)
         # gen_list = [group.to_numpy() for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]
         # gene_name_list = [name_of_the_group for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]  # added
-        end = time.time()
-        print('gen list completed in ' + str(end - start) + " sec")
-        start = time.time()
+        # end = time.time()
+        # print('gen list completed in ' + str(end - start) + " sec")
+        # start = time.time()
         # extracts the matrix_coverage and matrix_01
         matrix_coverage = self.create_matrix_coverage(gen_list, self.gen_max_lenght)
-        end = time.time()
-        print('coverage completed in ' + str(end - start) + " sec")
-        start = time.time()
+        # end = time.time()
+        # print('coverage completed in ' + str(end - start) + " sec")
+        # start = time.time()
         matrix_01 = self.create_matrix_01(matrix_coverage)
-        end = time.time()
-        print('matrix_01 completed in ' + str(end - start) + " sec")
+        # end = time.time()
+        # print('matrix_01 completed in ' + str(end - start) + " sec")
         # converts the matrices to pandas dataFrame
         # gene_name_list = bed_table_FP_reduced.index.unique()
-        start = time.time()
+        # start = time.time()
         matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
-        end = time.time()
-        print('conversion completed in ' + str(end - start) + " sec")
+        # end = time.time()
+        # print('conversion completed in ' + str(end - start) + " sec")
         return matrix_coverage, matrix_01
 
     def create_matrix_coverage(self, gen_list, gen_max_lenght):

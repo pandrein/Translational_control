@@ -117,10 +117,8 @@ def compare_pair_n_times(parallel_arguments):
         matrices_extractors.append({"me": me, "bed_file_name": bed_file_name})
 
     for i in range(n):
-        print("fake_comp " + str(i))
-        # start = time.time()
+        start = time.time()
         matrix_01_pair = []
-
         for matrices_extractor in matrices_extractors:
             bed_file_name = matrices_extractor["bed_file_name"]
             me = matrices_extractor["me"]
@@ -128,12 +126,11 @@ def compare_pair_n_times(parallel_arguments):
             pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=True)
             matrix_01_pair.append({'matrix': matrix_01, 'file_name': bed_file_name})
 
-        start = time.time()
         match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)
         pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
         match_scores.append({'pair_name': pair_names, 'match_score': match_score})
-        # end = time.time()
-        # print('comparisons completed in ' + str(end - start) + " sec")
+        end = time.time()
+        print("fake_comp " + str(i) + " in " + str(end - start) + "seconds")
     return match_scores
 
 
