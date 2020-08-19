@@ -40,7 +40,7 @@ reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/repr
 genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
 
-create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path,reproducible_sequence_output_dir])
+create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir])
 
 num_comparison = 5  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 FDR = 0.01
@@ -68,14 +68,14 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
 
 # FIX ME al momento esegue la parte modificata comparison_digital_profiles_human, verificare che sia corretta. Per e.coli provare la comparison_digital_profiles.
 def compute_real_match_scores(genes, bed_files_dicts):
-    print ("start real matrix digitalization...")
+    print("start real matrix digitalization...")
     matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=False)
     print("digitalization complete...")
 
     # gets the gene list for each matrix
     gene_lists = [pd.DataFrame(f['matrix'].index, columns={"GeneID"}) for f in matrix_01_list]
     # gets the genes in common for each matrix
-    gene_list = gene_lists[0]
+    gene_list = gene_lists[0] # FIX ME sarebbe possibile fin dall'inizio selezionare solo i geni a comune
     if len(gene_lists) > 1:
         for i in range(1, len(gene_lists)):
             l = gene_lists[i]
@@ -87,7 +87,7 @@ def compute_real_match_scores(genes, bed_files_dicts):
     # lists of pair of matrices
     pairs = [list(f) for f in combinations(matrix_01_list, 2)]
 
-    print ("start pair comparison...")
+    print("start pair comparison...")
     # saves match scores
     match_scores = []
     pair_names_list = []
@@ -108,19 +108,25 @@ def compare_pair_n_times(parallel_arguments):
     bed_files_pair, genes, gene_list, n = parallel_arguments
     # extract a pair of bed files
     match_scores = []
+
+    matrices_extractors = []
+    for bed_files_dict in bed_files_pair: #FIX ME creazione delle classi estrattori a monte, verificare correttezza
+        bed_file = bed_files_dict["bed_file"]
+        bed_file_name = bed_files_dict["bed_file_name"]
+        me = MatricesExtractor(bed_file, genes)
+        matrices_extractors.append({"me": me, "bed_file_name": bed_file_name})
+
     for i in range(n):
-        print("fake_comp "+str(i))
+        print("fake_comp " + str(i))
         # start = time.time()
         matrix_01_pair = []
-        for bed_files_dict in bed_files_pair:
-            bed_file = bed_files_dict["bed_file"]
-            bed_file_name = bed_files_dict["bed_file_name"]
-            me = MatricesExtractor(bed_file, genes)
+
+        for matrices_extractor in matrices_extractors:
+            bed_file_name = matrices_extractor["bed_file_name"]
+            me = matrices_extractor["me"]
             # extract the matrices
             pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=True)
             matrix_01_pair.append({'matrix': matrix_01, 'file_name': bed_file_name})
-        # end = time.time()
-        # print('01 completed in ' + str(end - start) + " sec")
 
         start = time.time()
         match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)
@@ -165,7 +171,7 @@ def main():
     # NOTA: processes rappresenta il numero di processi in parallelo che eseguono i calcoli.
     # Idealmente ce ne vorrebbe uno per ogni coppia di file bed (es. con 4 file l'ideale sarebbero 6 processi)
     # La cosa migliore è usare il numero maggiore di processi che possono stare in memoria
-    print ("start fake matrix comparisons")
+    print("start fake matrix comparisons")
     start = time.time()
     # res = []
     # for bed_files_pair in bed_files_pairs:
@@ -177,7 +183,7 @@ def main():
     #     match_scores_list.append(i.get())
     # end = time.time()
 
-    parallel_arguments = [[bed_files_pair,genes,gene_list,num_comparison] for bed_files_pair in bed_files_pairs]
+    parallel_arguments = [[bed_files_pair, genes, gene_list, num_comparison] for bed_files_pair in bed_files_pairs]
 
     res = p.map_async(compare_pair_n_times, parallel_arguments)
     p.close()
@@ -241,6 +247,7 @@ def main():
     first_matrix_01_with_only_reproducible_genes[~reproducible_sequence_mask] = 0
     reproducible_sequence = pd.DataFrame(first_matrix_01_with_only_reproducible_genes, index=reproducible_genes)
     reproducible_sequence.to_csv(os.path.join(reproducible_sequence_output_dir, "reproducible_sequence.csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+
 
 if __name__ == '__main__':
     main()
