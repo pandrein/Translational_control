@@ -31,7 +31,7 @@ import scipy.stats as st
 from statsmodels.stats.multitest import multipletests
 
 num_cores = multiprocessing.cpu_count()
-num_task = num_cores
+num_task = num_cores - 1
 
 # I/O directories
 input_dir = os.path.join(os.getcwd(), "check_reduced/")  # get the path to the data input directory
@@ -42,7 +42,7 @@ histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to 
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir])
 
-num_comparison = 10  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 12  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 FDR = 0.01
 
 
@@ -103,9 +103,10 @@ def compute_real_match_scores(genes, bed_files_dicts):
 
     return gene_list, match_scores, pair_names_list, matrix_01_list
 
+
 def random_comparison(arguments):
     start = time.time()
-    matrices_extractors,genes,gene_list = arguments
+    matrices_extractors, genes, gene_list = arguments
     matrix_01_pair = []
     for matrices_extractor in matrices_extractors:
         bed_file_name = matrices_extractor["bed_file_name"]
@@ -117,15 +118,19 @@ def random_comparison(arguments):
     match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)
     pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
     end = time.time()
-    print ("end_comparison in " +  str(end - start) + "seconds")
+    print("end_comparison in " + str(end - start) + "seconds")
     return {'pair_name': pair_names, 'match_score': match_score}
     # match_scores.append({'pair_name': pair_names, 'match_score': match_score})
 
+
 def compare_pair_n_times(parallel_arguments):
     bed_files_pair, genes, gene_list, n = parallel_arguments
-    pool = multiprocessing.Pool(processes=num_cores-1)
     # extract a pair of bed files
     match_scores = []
+
+    # print (n)
+    # print (int(np.floor(n/num_task)))
+    # print (n%num_task)
 
     matrices_extractors = []
     for bed_files_dict in bed_files_pair:  # FIX ME creazione delle classi estrattori a monte, verificare correttezza
@@ -134,16 +139,18 @@ def compare_pair_n_times(parallel_arguments):
         me = MatricesExtractor(bed_file, genes)
         matrices_extractors.append({"me": me, "bed_file_name": bed_file_name})
 
-    res = []
-    arguments = matrices_extractors,genes,gene_list
-    for i in range(n):
-        res.append(pool.apply_async(random_comparison, [arguments]))
-    pool.close()
-    pool.join()
 
-
-    for i in res:
-        match_scores.append(i.get())
+    arguments = matrices_extractors, genes, gene_list
+    num_parallel_comparison = int(np.floor(n/num_task))
+    for comp in range(num_parallel_comparison):
+        pool = multiprocessing.Pool(processes=num_task)
+        res = []
+        for thread in range(num_task):
+            res.append(pool.apply_async(random_comparison, [arguments]))
+        pool.close()
+        pool.join()
+        for i in res:
+            match_scores.append(i.get())
 
 
     return match_scores
