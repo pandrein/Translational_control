@@ -14,7 +14,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyranges as pr
-import cupy as cp
 
 class MatricesExtractor:
     def __init__(self, bed_table_FP_reduced, genes):

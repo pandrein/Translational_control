@@ -42,7 +42,7 @@ histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to 
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path,reproducible_sequence_output_dir])
 
-num_comparison = 10  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 5  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 FDR = 0.01
 
 
@@ -104,7 +104,8 @@ def compute_real_match_scores(genes, bed_files_dicts):
     return gene_list, match_scores, pair_names_list, matrix_01_list
 
 
-def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
+def compare_pair_n_times(parallel_arguments):
+    bed_files_pair, genes, gene_list, n = parallel_arguments
     # extract a pair of bed files
     match_scores = []
     for i in range(n):
@@ -166,15 +167,25 @@ def main():
     # La cosa migliore è usare il numero maggiore di processi che possono stare in memoria
     print ("start fake matrix comparisons")
     start = time.time()
-    res = []
-    for bed_files_pair in bed_files_pairs:
-        res.append(p.apply_async(compare_pair_n_times, [bed_files_pair, genes, gene_list, num_comparison]))
+    # res = []
+    # for bed_files_pair in bed_files_pairs:
+    #     res.append(p.apply_async(compare_pair_n_times, [bed_files_pair, genes, gene_list, num_comparison]))
+    #
+    # p.close()
+    # p.join()
+    # for i in res:
+    #     match_scores_list.append(i.get())
+    # end = time.time()
 
+    parallel_arguments = [[bed_files_pair,genes,gene_list,num_comparison] for bed_files_pair in bed_files_pairs]
+
+    res = p.map_async(compare_pair_n_times, parallel_arguments)
     p.close()
     p.join()
+    res = res.get()
 
     for i in res:
-        match_scores_list.append(i.get())
+        match_scores_list.append(i)
     end = time.time()
     print('fake matrix comparisons completed in ' + str(end - start) + "seconds")
 
