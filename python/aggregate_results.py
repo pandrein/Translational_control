@@ -27,12 +27,11 @@ match_scores_output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/
 reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/reproducible_sequence/")  # Sets the directory where all the saved outputs will be stored
 genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
+intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
 
-create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir])
+create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results])
 
-num_comparison = 7  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 FDR = 0.01
-
 
 def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
     matrix_01_list = []
@@ -214,25 +213,15 @@ def main():
     ifm = InputFileManager(genes_lengths_path, input_dir)
     genes = ifm.get_genes()
     bed_files_dicts = ifm.get_bed_files()
-    gene_list, _, _, _ = compute_real_match_scores(genes, bed_files_dicts)  # FIX ME è totalmente inutile fare tutti i calcoli per calcolare il gene_list... andrebbe messa una funzione a parte
 
-    # create pairs of bed files
-    bed_files_pairs = [list(f) for f in combinations(bed_files_dicts, 2)]
-    print("start fake matrix comparisons...")
-    start = time.time()
+    exts = tuple([".npy"])
+    intermediate_results_path_list = [os.path.abspath(os.path.join(intermediate_results, f)) for f in os.listdir(intermediate_results) if f.endswith(exts)]
+
     match_scores_list = []
-
-    for bed_files_pair in bed_files_pairs:
-        match_scores_list.append(compare_pair_n_times(bed_files_pair, genes, gene_list, num_comparison))
-    end = time.time()
-    print('fake matrix comparisons completed in ' + str(end - start) + " sec(s)")
-
-    with open('match_scores_list.npy', 'wb') as f:
-        np.save(f, match_scores_list)
-
-    with open('match_scores_list.npy', 'rb') as f:
-        match_scores_list = np.load(f, allow_pickle=True)
-
+    for i in intermediate_results_path_list:
+        with open(i, 'rb') as f:
+            ir = np.load(f, allow_pickle=True)
+            match_scores_list.extend(ir) #FIX ME verificare che extend faccia la cosa corretta...
     gene_list, match_scores_real, pair_names_list, matrix_01_list = compute_real_match_scores(genes, bed_files_dicts)
     calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, match_scores_real, matrix_01_list)
 

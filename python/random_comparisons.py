@@ -27,11 +27,11 @@ match_scores_output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/
 reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/reproducible_sequence/")  # Sets the directory where all the saved outputs will be stored
 genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
+intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
 
-create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir])
+create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir,intermediate_results])
 
-num_comparison = 7  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
-FDR = 0.01
+num_comparison = 10  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 
 
 def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
@@ -208,13 +208,13 @@ def extract_reproducible_sequences(reproducible_genes, matrix_01_list):
     return reproducible_sequence_mask, reproducible_genes_tables[0].to_numpy()
 
 
-def main():
+def main(num):
     print("num of core available: " + str(num_cores) + " used: " + str(num_task))
 
     ifm = InputFileManager(genes_lengths_path, input_dir)
     genes = ifm.get_genes()
     bed_files_dicts = ifm.get_bed_files()
-    gene_list, _, _, _ = compute_real_match_scores(genes, bed_files_dicts)  # FIX ME è totalmente inutile fare tutti i calcoli per calcolare il gene_list... andrebbe messa una funzione a parte
+    gene_list, _, _, _ = compute_real_match_scores(genes, bed_files_dicts, save_results=False)  # FIX ME è totalmente inutile fare tutti i calcoli per calcolare il gene_list... andrebbe messa una funzione a parte
 
     # create pairs of bed files
     bed_files_pairs = [list(f) for f in combinations(bed_files_dicts, 2)]
@@ -227,15 +227,14 @@ def main():
     end = time.time()
     print('fake matrix comparisons completed in ' + str(end - start) + " sec(s)")
 
-    with open('match_scores_list.npy', 'wb') as f:
+    with open(intermediate_results+'/match_scores_list_' + str(num) + '_aggregating_' + str(num_comparison) + 'comparisons.npy', 'wb') as f:
         np.save(f, match_scores_list)
-
-    with open('match_scores_list.npy', 'rb') as f:
-        match_scores_list = np.load(f, allow_pickle=True)
-
-    gene_list, match_scores_real, pair_names_list, matrix_01_list = compute_real_match_scores(genes, bed_files_dicts)
-    calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, match_scores_real, matrix_01_list)
 
 
 if __name__ == '__main__':
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description='riboseq reproducibility')
+    parser.add_argument('--num', metavar='n', required=False, help='experiment identifier')
+    args = parser.parse_args()
+    main(num=args.num)
