@@ -27,11 +27,12 @@ match_scores_output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/
 reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/reproducible_sequence/")  # Sets the directory where all the saved outputs will be stored
 genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
-intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
+intermediate_results = os.path.join(os.getcwd(), "intermediate_results_not_random/")
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results])
 
 FDR = 0.01
+
 
 def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
     matrix_01_list = []
@@ -68,8 +69,10 @@ def compute_real_match_scores(genes, bed_files_dicts, save_results=True):
             l = gene_lists[i]
             gene_list = gene_list.merge(l, on="GeneID")
 
+
     # gene_list['GeneID'] = gene_list.index
     gene_list = gene_list.to_numpy().squeeze()
+
 
     # lists of pair of matrices
     pairs = [list(f) for f in combinations(matrix_01_list, 2)]
@@ -92,49 +95,6 @@ def compute_real_match_scores(genes, bed_files_dicts, save_results=True):
     return gene_list, match_scores, pair_names_list, matrix_01_list
 
 
-def random_comparison(arguments):
-    start = time.time()
-    matrices_extractors, genes, gene_list = arguments
-    matrix_01_pair = []
-    for matrices_extractor in matrices_extractors:
-        bed_file_name = matrices_extractor["bed_file_name"]
-        me = matrices_extractor["me"]
-        # extract the matrices
-        pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=True)
-        matrix_01_pair.append({'matrix': matrix_01, 'file_name': bed_file_name})
-
-    match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)
-    pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
-    end = time.time()
-    print("end_comparison in " + str(end - start) + "seconds")
-    return {'pair_name': pair_names, 'match_score': match_score}
-    # match_scores.append({'pair_name': pair_names, 'match_score': match_score})
-
-
-def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
-    # extract a pair of bed files
-    match_scores = []
-
-    matrices_extractors = []
-    for bed_files_dict in bed_files_pair:  # FIX ME creazione delle classi estrattori a monte, verificare correttezza
-        bed_file = bed_files_dict["bed_file"]
-        bed_file_name = bed_files_dict["bed_file_name"]
-        me = MatricesExtractor(bed_file, genes)
-        matrices_extractors.append({"me": me, "bed_file_name": bed_file_name})
-
-    arguments = matrices_extractors, genes, gene_list
-    pool = multiprocessing.Pool(processes=num_task)
-    res = []
-    for i in range(n):
-        res.append(pool.apply_async(random_comparison, [arguments]))
-    pool.close()
-    pool.join()
-    for i in res:
-        match_scores.append(i.get())
-
-    return match_scores
-
-
 def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, match_scores_real, matrix_01_list):
     # compute the match score histograms for the random comparisons
     match_scores_hist = {}
@@ -154,6 +114,8 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
                 match_scores_hist[pair_name] = gene_hist
     p_value_matrix = pd.DataFrame(index=gene_list, columns=pair_names_list)
 
+    plot_num = 0
+
     # extract pvalues for each gene and dataset pair
     for pair_name in match_scores_hist:
         for gene in match_scores_hist[pair_name]:
@@ -169,16 +131,30 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
                     pvalue = st.norm.sf(abs(z_score))
                     p_value_matrix[pair_name][gene] = pvalue
                     # p_value_matrix[gene][pair_name] = pvalue
-            # gene_hist.plot.hist(grid=True, bins=20, rwidth=0.9, color='#607c8e')
-            # plt.savefig(histogram_plot_path+"dataset_pair:" + pair_name + " gene:" + gene + ".png")
-            # plt.figure(i) #NOTA: fatto solo per evitare di sovrascrivere i plot, credo ci siano modi migliori...
-            # i += 1
+            # if (plot_num < 3):
+            #     print(gene)
+            #     print(pair_name)
+            #     plt.figure()
+            #     gene_hist.plot.hist(grid=True, bins=10, rwidth=0.9, color='#607c8e')
+            #     plt.show()
+
+            plot_num += 1
 
     reproducible_genes = []
     for gene, pvalue_row in p_value_matrix.iterrows():
         pvalue_row = pvalue_row.to_numpy()
         y = multipletests(pvals=pvalue_row, alpha=FDR, method="fdr_bh")
         number_of_significative_values = len(y[1][np.where(y[1] < FDR)])
+
+        print("gene")
+        print(gene)
+        print("pvalue row")
+        print(pvalue_row)
+        print("Benjamini-Hockberg thresholds")
+        print(y[1])
+        print("number of significative values")
+        print(number_of_significative_values)
+
         # if all the pvalues are below the threshold for each dataset then the gene can be considered reproducible
         if number_of_significative_values == len(pair_names_list):
             reproducible_genes.append(gene)
@@ -194,13 +170,13 @@ def extract_reproducible_sequences(reproducible_genes, matrix_01_list):
     # for each matrix_01 select only the reproducible genes
     reproducible_genes_tables = [matrix_01_struct['matrix'][matrix_01_struct['matrix'].index.isin(reproducible_genes)] for matrix_01_struct in matrix_01_list]
     # select the elements that are one for all the sequences
-    sequences_ones_mask = [(f == 1).to_numpy() for f in reproducible_genes_tables]  # FIX ME per fare il confronto qui passo a numpy. Andrebbe verificato che i genei confrontati siano quelli giusti
+    sequences_ones_mask = [(f == 1).to_numpy() for f in reproducible_genes_tables]
     sequences_ones_mask = np.stack(sequences_ones_mask)
     all_ones = np.all(sequences_ones_mask, axis=0)
     # select the elements that are minus one for all the sequences
     sequences_minus_ones_mask = [(f == -1).to_numpy() for f in reproducible_genes_tables]  # FIX ME verifica se si può valutare la condizione di uguaglianza con -1 e 1 in un passo solo
     sequences_minus_ones_mask = np.stack(sequences_minus_ones_mask)
-    all_minus_ones = np.all(sequences_minus_ones_mask, axis=0)  # FIX ME verificare il comportamento con i nan
+    all_minus_ones = np.all(sequences_minus_ones_mask, axis=0)
     # get a mask with all the elements that are one and minus one for all the sequences
     reproducible_sequence_mask = np.stack([all_ones, all_minus_ones])
     reproducible_sequence_mask = np.any(reproducible_sequence_mask, axis=0)
@@ -221,7 +197,7 @@ def main():
     for i in intermediate_results_path_list:
         with open(i, 'rb') as f:
             ir = np.load(f, allow_pickle=True)
-            match_scores_list.extend(ir) #FIX ME verificare che extend faccia la cosa corretta...
+            match_scores_list.extend(ir)
     gene_list, match_scores_real, pair_names_list, matrix_01_list = compute_real_match_scores(genes, bed_files_dicts)
     calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, match_scores_real, matrix_01_list)
 

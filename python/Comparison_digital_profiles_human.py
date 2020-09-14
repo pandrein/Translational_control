@@ -20,7 +20,7 @@ def compare_pair(pair, genes_lengths, gene_list):
     # selects for each matrix only the genes in common
     pair_matrix_cleaned = [f.loc[gene_list, :] for f in pair_matrix]
     # binarize (True for each element equal to 1) and convert to numpy
-    pair_matrix_with_same_col_dim = [f.to_numpy()[:, ~np.isnan(f).all(0)] for f in pair_matrix_cleaned]  # change
+    pair_matrix_with_same_col_dim = [f.to_numpy()[:, ~np.isnan(f).all(0)] for f in pair_matrix_cleaned]
     pair_matrix_binarized = [f == 1 for f in pair_matrix_with_same_col_dim]
     # pair_matrix_binarized = [(f == 1).to_numpy() for f in pair_matrix_cleaned]
     # stacks the pair in a multidimensional array

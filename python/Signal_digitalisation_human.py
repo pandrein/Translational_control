@@ -17,6 +17,7 @@ import pyranges as pr
 
 import time
 
+
 class MatricesExtractor:
     def __init__(self, bed_table_FP_reduced, genes):
         self.bed_table_FP_reduced = bed_table_FP_reduced
@@ -41,44 +42,24 @@ class MatricesExtractor:
         return bed_table_rand
 
     # defining function to be applied to every bed file
-    def extract_matrices(self,areReadsRandomized=False):
+    def extract_matrices(self, areReadsRandomized=False):
 
         ######################
         #### FP READS ########
         ######################
         # creates a table joining the list of genes present in bed_table_FP_reduced and the number of reads mapping on each of them
-        # start = time.time()
         bed_table_FP_reduced = self.bed_table_FP_reduced
         if areReadsRandomized:
             bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)
-        # end = time.time()
-        # print('randomization completed in ' + str(end - start) + " sec")
-        # start = time.time()
         gen_list = []
         gene_name_list = []
         for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome"):
             gen_list.append(group.to_numpy())
             gene_name_list.append(name_of_the_group)
-        # gen_list = [group.to_numpy() for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]
-        # gene_name_list = [name_of_the_group for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome")]  # added
-        # end = time.time()
-        # print('gen list completed in ' + str(end - start) + " sec")
-        # start = time.time()
-        # extracts the matrix_coverage and matrix_01
         matrix_coverage = self.create_matrix_coverage(gen_list, self.gen_max_lenght)
-        # end = time.time()
-        # print('coverage completed in ' + str(end - start) + " sec")
-        # start = time.time()
         matrix_01 = self.create_matrix_01(matrix_coverage)
-        # end = time.time()
-        # print('matrix_01 completed in ' + str(end - start) + " sec")
-        # converts the matrices to pandas dataFrame
-        # gene_name_list = bed_table_FP_reduced.index.unique()
-        # start = time.time()
         matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
-        # end = time.time()
-        # print('conversion completed in ' + str(end - start) + " sec")
         return matrix_coverage, matrix_01
 
     def create_matrix_coverage(self, gen_list, gen_max_lenght):
@@ -104,14 +85,12 @@ class MatricesExtractor:
                 if i in counts_end_dict:
                     val -= counts_end_dict[i]
                 # vector_coverage[i] = val
-                matrix_coverage[gene_idx, i] = val #FIX_ME verificare che funzioni uguale...
+                matrix_coverage[gene_idx, i] = val
             # matrix_coverage[gene_idx, :] = vector_coverage
             # matrix_coverage.append(vector_coverage)
         # cp.cuda.Stream.null.synchronize()
 
         return matrix_coverage
-
-
 
     def add_rand_to_matrix(self, matrix_coverage):
         rand_add = (np.random.random(np.shape(matrix_coverage)) * 0.001) + 0.001  # add small random values to avoid an artifact that comes out when we compute the median of a vector having many zeros
@@ -119,10 +98,7 @@ class MatricesExtractor:
         return matrix_01
 
     def subtract_median_to_matrix(self, matrix_01, median):
-        # median = np.expand_dims(median, axis=1)
-        # median = median.repeat(np.shape(matrix_01)[1], axis=1)
-        # matrix_01 = np.subtract(matrix_01, median)  # element by element subtraction between arrays
-        median = median[:, np.newaxis] #FIX ME modificato per farlo con broadcasting... da verificare
+        median = median[:, np.newaxis]
         matrix_01 = matrix_01 - median
         return matrix_01
 
@@ -142,6 +118,21 @@ class MatricesExtractor:
 
         return matrix_01
 
+
+    # # ADD RANDOM ON THE 0 ELEMENTS OF MEDIAN
+    # def create_matrix_01(self, matrix_coverage):
+    #     # CREATING MATRIX 01
+    #     # compare the profile heights at each nucleotide position (coverage) with its median value computed along the entire ORF
+    #     # matrix_01 = self.add_rand_to_matrix(matrix_coverage)
+    #     # computes the median of the coverage values at each nucleotide.
+    #     median = np.nanmedian(matrix_coverage, axis=1)  # Computes the median along the entire ORF, while ignoring NaNs.
+    #     median[median == 0] = 0.0001
+    #     matrix_01 = self.subtract_median_to_matrix(matrix_coverage, median)
+    #     # assigns +1 to the positions having a coverage value higher than the median.
+    #     # assigns -1 to the positions having a coverage value lower than the median.
+    #     matrix_01[matrix_01 >= 0] = 1
+    #     matrix_01[matrix_01 < 0] = -1
+    #     return matrix_01
 
 def main():
     # I/O directories
