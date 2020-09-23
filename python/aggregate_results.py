@@ -27,7 +27,7 @@ match_scores_output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/
 reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/reproducible_sequence/")  # Sets the directory where all the saved outputs will be stored
 genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
-intermediate_results = os.path.join(os.getcwd(), "intermediate_results_not_random/")
+intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results])
 
@@ -92,6 +92,19 @@ def compute_real_match_scores(genes, bed_files_dicts, save_results=True):
             match_score.to_csv(os.path.join(match_scores_output_dir, pair_names), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
     print("real comparison complete")
 
+    # # print (pair_names_list)
+    # transtlation = {"GSE64488":"1α","GSE90056":"3β","GSE72899":"6γ","GSE53767":"8δ","GSE51052":"9","GSE58637":"10ζ","GSE77617":"11η","GSE35641":"12θ","GSE88725":"14ι"}
+    # # for t in transtlation:
+    # #     print(t)
+    # translated_list = []
+    # for list_name in pair_names_list:
+    #     for t in transtlation:
+    #         translated_list.append(list_name.replace(t,transtlation[t]))
+    #         # print(transtlation[t])
+    #         # print(t)
+    # print (translated_list)
+    # sys.exit()
+
     return gene_list, match_scores, pair_names_list, matrix_01_list
 
 
@@ -143,21 +156,36 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
     reproducible_genes = []
     for gene, pvalue_row in p_value_matrix.iterrows():
         pvalue_row = pvalue_row.to_numpy()
-        y = multipletests(pvals=pvalue_row, alpha=FDR, method="fdr_bh")
-        number_of_significative_values = len(y[1][np.where(y[1] < FDR)])
 
-        print("gene")
-        print(gene)
-        print("pvalue row")
-        print(pvalue_row)
-        print("Benjamini-Hockberg thresholds")
-        print(y[1])
-        print("number of significative values")
-        print(number_of_significative_values)
+        # y = multipletests(pvals=pvalue_row, alpha=FDR, method="fdr_bh")
+        # number_of_significative_values_python = len(y[1][np.where(y[1] < FDR)])
 
-        # if all the pvalues are below the threshold for each dataset then the gene can be considered reproducible
-        if number_of_significative_values == len(pair_names_list):
-            reproducible_genes.append(gene)
+        #
+        # print("gene")
+        # print(gene)
+        # print("pvalue row")
+        # print(pvalue_row)
+        # print("Benjamini-Hockberg thresholds")
+        # print(y[1])
+        # print("number of significative values")
+        # print(number_of_significative_values)
+        #
+        # # if all the pvalues are below the threshold for each dataset then the gene can be considered reproducible
+        # if number_of_significative_values == len(pair_names_list):
+        #     reproducible_genes.append(gene)
+
+        pvalue_row = np.sort(pvalue_row)
+        critical_values = ((np.nonzero(pvalue_row >= 0)[0] + 1) / 21) * FDR
+        bh_candidates = pvalue_row[pvalue_row <= critical_values]
+        # print ("funzione multipletests:" + str(number_of_significative_values_python)+"   funzione di davide:"+str(len(bh_candidates)))
+
+        if len(bh_candidates) > 0:
+            idx_of_max_value = np.argwhere(bh_candidates == np.amax(bh_candidates)).flatten().tolist()[-1] + 1
+            bh_selected = pvalue_row[np.array(range(0, idx_of_max_value))]
+            if len(bh_selected)==len(pair_names_list):
+                reproducible_genes.append(gene)
+
+
 
     reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
     # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
