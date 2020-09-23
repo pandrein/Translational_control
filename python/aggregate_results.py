@@ -69,10 +69,8 @@ def compute_real_match_scores(genes, bed_files_dicts, save_results=True):
             l = gene_lists[i]
             gene_list = gene_list.merge(l, on="GeneID")
 
-
     # gene_list['GeneID'] = gene_list.index
     gene_list = gene_list.to_numpy().squeeze()
-
 
     # lists of pair of matrices
     pairs = [list(f) for f in combinations(matrix_01_list, 2)]
@@ -157,8 +155,8 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
     for gene, pvalue_row in p_value_matrix.iterrows():
         pvalue_row = pvalue_row.to_numpy()
 
-        # y = multipletests(pvals=pvalue_row, alpha=FDR, method="fdr_bh")
-        # number_of_significative_values_python = len(y[1][np.where(y[1] < FDR)])
+        y = multipletests(pvals=pvalue_row, alpha=FDR, method="fdr_bh")
+        number_of_significative_values_python = len(y[1][np.where(y[1] < FDR)])
 
         #
         # print("gene")
@@ -175,17 +173,15 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
         #     reproducible_genes.append(gene)
 
         pvalue_row = np.sort(pvalue_row)
-        critical_values = ((np.nonzero(pvalue_row >= 0)[0] + 1) / 21) * FDR
+        critical_values = ((np.nonzero(pvalue_row >= 0)[0] + 1) / len(pair_names_list)) * FDR
         bh_candidates = pvalue_row[pvalue_row <= critical_values]
-        # print ("funzione multipletests:" + str(number_of_significative_values_python)+"   funzione di davide:"+str(len(bh_candidates)))
+        print ("funzione multipletests:" + str(number_of_significative_values_python)+"   funzione di davide:"+str(len(bh_candidates)))
 
         if len(bh_candidates) > 0:
             idx_of_max_value = np.argwhere(bh_candidates == np.amax(bh_candidates)).flatten().tolist()[-1] + 1
             bh_selected = pvalue_row[np.array(range(0, idx_of_max_value))]
-            if len(bh_selected)==len(pair_names_list):
+            if len(bh_selected) == len(pair_names_list):
                 reproducible_genes.append(gene)
-
-
 
     reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
     # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
