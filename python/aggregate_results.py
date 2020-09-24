@@ -67,6 +67,8 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
         pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=areReadsRandomized)
         if plot_data:
             for gene, coverage in pd_matrix_coverage.iterrows():
+                coverage = coverage[~np.isnan(coverage)]
+
                 match_scores_hist_pair_plot_folder = os.path.join(match_coverage_hist_plot_folder, bed_file_name)
                 create_dir_if_not_exist([match_scores_hist_pair_plot_folder])
                 # print_full(coverage)
@@ -74,9 +76,7 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
                 plot = sns.lineplot(x, coverage, color='black')
                 plot.fill_between(x, coverage, color='black')
 
-                plot.set(xticks=((0,1)))
-                # print (match_scores_hist_pair_plot_folder)
-                # print(os.path.join(match_scores_hist_pair_plot_folder, "gene:" + gene))
+                plot.set(xticks=((x[0::int(len(coverage) * 0.08)])))
                 plot.get_figure().savefig(os.path.join(match_scores_hist_pair_plot_folder, "gene:" + gene))
                 plot.get_figure().clf()
 
