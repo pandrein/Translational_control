@@ -31,7 +31,7 @@ intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir,intermediate_results])
 
-num_comparison = 100  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 1  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 
 
 def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):

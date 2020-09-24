@@ -13,6 +13,24 @@ import sys
 import numpy as np
 import scipy.stats as st
 from statsmodels.stats.multitest import multipletests
+import seaborn as sns
+
+np.set_printoptions(threshold=sys.maxsize)
+
+
+def print_full(x):
+    pd.set_option('display.max_rows', len(x))
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', 2000)
+    pd.set_option('display.float_format', '{:20,.2f}'.format)
+    pd.set_option('display.max_colwidth', None)
+    print(x)
+    pd.reset_option('display.max_rows')
+    pd.reset_option('display.max_columns')
+    pd.reset_option('display.width')
+    pd.reset_option('display.float_format')
+    pd.reset_option('display.max_colwidth')
+
 
 # from multiprocessing import set_start_method
 # set_start_method("spawn")
@@ -20,6 +38,8 @@ from statsmodels.stats.multitest import multipletests
 
 num_cores = multiprocessing.cpu_count()
 num_task = num_cores - 1
+plot_data = True
+num_bins = 15
 
 # I/O directories
 input_dir = os.path.join(os.getcwd(), "check_reduced/")  # get the path to the data input directory
@@ -28,8 +48,11 @@ reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/repr
 genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
 intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
+plots_folder = os.path.join(os.getcwd(), "plots/")
+match_scores_hist_plot_folder = os.path.join(plots_folder, "match_scores_hist/")
+match_coverage_hist_plot_folder = os.path.join(plots_folder, "coverage_hist/")
 
-create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results])
+create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results, plots_folder, match_scores_hist_plot_folder])
 
 FDR = 0.01
 
@@ -42,15 +65,23 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
         me = MatricesExtractor(bed_file, genes)
         # extract the matrices
         pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=areReadsRandomized)
+        if plot_data:
+            for gene, coverage in pd_matrix_coverage.iterrows():
+                match_scores_hist_pair_plot_folder = os.path.join(match_coverage_hist_plot_folder, bed_file_name)
+                create_dir_if_not_exist([match_scores_hist_pair_plot_folder])
+                # print_full(coverage)
+                x = range(0, len(coverage))
+                plot = sns.lineplot(x, coverage, color='black')
+                plot.fill_between(x, coverage, color='black')
+
+                plot.set(xticks=((0,1)))
+                # print (match_scores_hist_pair_plot_folder)
+                # print(os.path.join(match_scores_hist_pair_plot_folder, "gene:" + gene))
+                plot.get_figure().savefig(os.path.join(match_scores_hist_pair_plot_folder, "gene:" + gene))
+                plot.get_figure().clf()
+
         matrix_01_list.append({'matrix': matrix_01, 'file_name': bed_file_name})
 
-        # NOTA: per velocizzare le operazioni per ora ho tolto il salvataggio
-        # coverage_matrix_csv_path = os.path.join(match_scores_output_dir, bed_file_name + "_matrix_coverage.csv")
-        # matrix_01_csv_path = os.path.join(match_scores_output_dir, bed_file_name + "_matrix_01.csv")
-
-        # # Exports the dataFrames into CSV files
-        # matrix_01.to_csv(matrix_01_csv_path, index=True)
-        # pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
     return matrix_01_list
 
 
@@ -134,6 +165,14 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
             hist_mean = np.mean(gene_hist)
             hist_std = np.std(gene_hist)
 
+            if plot_data:
+                match_scores_hist_pair_plot_folder = os.path.join(match_scores_hist_plot_folder, pair_name)
+                create_dir_if_not_exist([match_scores_hist_pair_plot_folder])
+                sns.set_style('darkgrid')
+                plot = sns.distplot(gene_hist, bins=num_bins).set_title("hist_mean: " + str('%.5f' % hist_mean) + "   hist_std: " + str('%.5f' % hist_std))
+                plot.get_figure().savefig(os.path.join(match_scores_hist_pair_plot_folder, "gene:" + gene))
+                plot.get_figure().clf()
+
             for match_score_real in match_scores_real:
                 pair_name_real = match_score_real["pair_name"]
                 if pair_name_real == pair_name:
@@ -175,7 +214,7 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
         pvalue_row = np.sort(pvalue_row)
         critical_values = ((np.nonzero(pvalue_row >= 0)[0] + 1) / len(pair_names_list)) * FDR
         bh_candidates = pvalue_row[pvalue_row <= critical_values]
-        print ("funzione multipletests:" + str(number_of_significative_values_python)+"   funzione di davide:"+str(len(bh_candidates)))
+        # print ("funzione multipletests:" + str(number_of_significative_values_python)+"   funzione di davide:"+str(len(bh_candidates)))
 
         if len(bh_candidates) > 0:
             idx_of_max_value = np.argwhere(bh_candidates == np.amax(bh_candidates)).flatten().tolist()[-1] + 1
