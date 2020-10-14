@@ -1,21 +1,22 @@
 import multiprocessing
 import os
-import time
+import sys
 from itertools import combinations
 from pathlib import Path
-import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import scipy.stats as st
+import seaborn as sns
+from statsmodels.stats.multitest import multipletests
 from Comparison_digital_profiles_human import compare_pair
 from Signal_digitalisation_human import MatricesExtractor
 from utils import InputFileManager
 from utils import create_dir_if_not_exist
-import sys
-import numpy as np
-import scipy.stats as st
-from statsmodels.stats.multitest import multipletests
-import seaborn as sns
 
 np.set_printoptions(threshold=sys.maxsize)
+
+load_intermediate_results_from_csv = True
+add_small_random_value_to_real_scores = False
 
 
 def print_full(x):
@@ -30,10 +31,6 @@ def print_full(x):
     pd.reset_option('display.width')
     pd.reset_option('display.float_format')
     pd.reset_option('display.max_colwidth')
-
-
-# from multiprocessing import set_start_method
-# set_start_method("spawn")
 
 
 num_cores = multiprocessing.cpu_count()
@@ -51,20 +48,20 @@ intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
 plots_folder = os.path.join(os.getcwd(), "plots/")
 match_scores_hist_plot_folder = os.path.join(plots_folder, "match_scores_hist/")
 match_coverage_hist_plot_folder = os.path.join(plots_folder, "coverage_hist/")
-
-create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results, plots_folder, match_scores_hist_plot_folder])
+path_match_score_csv = os.path.join(os.getcwd(), "path_match_score_csv/")
+create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results, plots_folder, match_scores_hist_plot_folder,path_match_score_csv])
 
 FDR = 0.01
 
 
-def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
+def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized, add_small_random_value):
     matrix_01_list = []
     for bed_files_dict in bed_files_dicts:
         bed_file = bed_files_dict["bed_file"]
         bed_file_name = bed_files_dict["bed_file_name"]
         me = MatricesExtractor(bed_file, genes)
         # extract the matrices
-        pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=areReadsRandomized)
+        pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=areReadsRandomized, add_small_random_value=add_small_random_value)
         if plot_data:
             for gene, coverage in pd_matrix_coverage.iterrows():
                 coverage = coverage[~np.isnan(coverage)]
@@ -88,7 +85,7 @@ def signal_digitalisation(genes, bed_files_dicts, areReadsRandomized):
 # FIX ME al momento esegue la parte modificata comparison_digital_profiles_human, verificare che sia corretta. Per e.coli provare la comparison_digital_profiles.
 def compute_real_match_scores(genes, bed_files_dicts, save_results=True):
     print("start real matrix digitalization...")
-    matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=False)
+    matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=False, add_small_random_value=add_small_random_value_to_real_scores)
     print("digitalization complete...")
 
     # gets the gene list for each matrix
@@ -154,6 +151,7 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
                     match_scores_hist[pair_name][gene].append(match_score)  # = [match_score]
             else:
                 match_scores_hist[pair_name] = gene_hist
+
     p_value_matrix = pd.DataFrame(index=gene_list, columns=pair_names_list)
 
     plot_num = 0
@@ -253,15 +251,33 @@ def main():
     genes = ifm.get_genes()
     bed_files_dicts = ifm.get_bed_files()
 
-    exts = tuple([".npy"])
-    intermediate_results_path_list = [os.path.abspath(os.path.join(intermediate_results, f)) for f in os.listdir(intermediate_results) if f.endswith(exts)]
-
     match_scores_list = []
-    for i in intermediate_results_path_list:
-        with open(i, 'rb') as f:
-            ir = np.load(f, allow_pickle=True)
-            match_scores_list.extend(ir)
+    if load_intermediate_results_from_csv:
+        intermediate_results_path_list = [os.path.abspath(os.path.join(path_match_score_csv, f)) for f in os.listdir(path_match_score_csv) if f.endswith(tuple([".csv"]))]
+        for i in intermediate_results_path_list:
+            with open(i, 'r') as f:
+                match_scores = []
+                gene_list = []
+                ir = pd.read_csv(f)
+                for (columnName, columnData) in ir.iteritems():
+                    if columnName == "Unnamed: 0":
+                        gene_list.append(columnData.to_numpy())
+                    else:
+                        match_scores.append(columnData.to_numpy())
+
+                for match_score in match_scores:
+                    s = pd.Series(match_score, index=gene_list[0]).rename_axis("GeneID")
+                    match_scores_list.append({"pair_name": str(Path(os.path.basename(i)).with_suffix('')), "match_score": s})
+        match_scores_list = [match_scores_list]
+    else:
+        intermediate_results_path_list = [os.path.abspath(os.path.join(intermediate_results, f)) for f in os.listdir(intermediate_results) if f.endswith(tuple([".npy"]))]
+        for i in intermediate_results_path_list:
+            with open(i, 'rb') as f:
+                ir = np.load(f, allow_pickle=True)
+                match_scores_list.extend(ir)
+
     gene_list, match_scores_real, pair_names_list, matrix_01_list = compute_real_match_scores(genes, bed_files_dicts)
+
     calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, match_scores_real, matrix_01_list)
 
 
