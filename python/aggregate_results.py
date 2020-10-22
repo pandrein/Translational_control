@@ -15,7 +15,7 @@ from utils import create_dir_if_not_exist
 
 np.set_printoptions(threshold=sys.maxsize)
 
-load_intermediate_results_from_csv = True
+load_intermediate_results_from_csv = False
 add_small_random_value_to_real_scores = False
 
 

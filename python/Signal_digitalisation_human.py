@@ -14,12 +14,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyranges as pr
-
+import sys
 import time
+from utils import create_dir_if_not_exist
+
+np.random.seed(10)
 
 
 class MatricesExtractor:
-    def __init__(self, bed_table_FP_reduced, genes):
+    def __init__(self, bed_table_FP_reduced, genes, bed_file_name=" "):
+        self.bed_file_name = bed_file_name
+
         self.bed_table_FP_reduced = bed_table_FP_reduced
         self.genes = genes
         table_FP = self.bed_table_FP_reduced["Chromosome"].value_counts().sort_index().rename_axis('GeneID').reset_index(name='ReadsCounts')
@@ -30,7 +35,7 @@ class MatricesExtractor:
         self.bed_table_FP_reduced = self.bed_table_FP_reduced.join(table_FP_Geneslengths.set_index('GeneID'), on='Chromosome').set_index("Chromosome")
 
     def randomize_reads(self, bed_table):
-        readsLength = bed_table["End"] - bed_table["Start"]
+        readsLength = bed_table["End"] - bed_table["Start"] + 1
         randomStartInterval = bed_table["GeneLength"] - readsLength
         random_vector = np.random.rand(len(readsLength))
         randomStarts = (random_vector * randomStartInterval).astype(int)
@@ -42,7 +47,7 @@ class MatricesExtractor:
         return bed_table_rand
 
     # defining function to be applied to every bed file
-    def extract_matrices(self, areReadsRandomized=False, add_small_random_value=False):
+    def extract_matrices(self, areReadsRandomized=False, add_small_random_value=False, rep_num=0):
 
         ######################
         #### FP READS ########
@@ -50,14 +55,27 @@ class MatricesExtractor:
         # creates a table joining the list of genes present in bed_table_FP_reduced and the number of reads mapping on each of them
         bed_table_FP_reduced = self.bed_table_FP_reduced
         if areReadsRandomized:
-            bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)
+            bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)  # randomizza tutte le reads
+
+        random_start_reads = bed_table_FP_reduced["Start"]
+        group_by_genes = random_start_reads.groupby("Chromosome")
+
+        if areReadsRandomized:
+            folder_rand_reads = "./reads_random/"
+            create_dir_if_not_exist([folder_rand_reads])
+
+            for name_of_the_group, group in group_by_genes:  # salva le reads random FIX ME andrebbe fatto solo quando areReadsRandomized = True???
+                creation_path = os.path.join(folder_rand_reads, name_of_the_group)
+                create_dir_if_not_exist([creation_path])
+                group.to_csv(os.path.join(creation_path, "bedfile_" + self.bed_file_name + "_rep_" + str(rep_num) + ".csv"))
+
         gen_list = []
         gene_name_list = []
         for name_of_the_group, group in bed_table_FP_reduced.groupby("Chromosome"):
             gen_list.append(group.to_numpy())
             gene_name_list.append(name_of_the_group)
-        matrix_coverage = self.create_matrix_coverage(gen_list, self.gen_max_lenght)
-        matrix_01 = self.create_matrix_01(matrix_coverage, add_small_random_value=add_small_random_value)
+        matrix_coverage = self.create_matrix_coverage(gen_list, self.gen_max_lenght)  # crea la matrice di coverage
+        matrix_01 = self.create_matrix_01(matrix_coverage, add_small_random_value=add_small_random_value) # crea la matrice 01
         matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
         return matrix_coverage, matrix_01
