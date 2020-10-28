@@ -59,7 +59,7 @@ def extract_gene_list(genes, bed_files_dicts):
     return gene_list
 
 
-def random_comparison(arguments, rep_num=0):
+def random_comparison(arguments, rep_num=0): # esegue i confronti random
     start = time.time()
     matrices_extractors, genes, gene_list = arguments
     matrix_01_pair = []
@@ -77,6 +77,7 @@ def random_comparison(arguments, rep_num=0):
             matrix_01.to_csv(os.path.join(save_dir, str(rep_num) + ".csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
     match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)  # compara coppie di file bed  (di matrici 0-1)
+
     pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
     end = time.time()
     print("end_comparison in " + str(end - start) + "seconds")
@@ -113,7 +114,7 @@ def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
     return match_scores
 
 
-def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n):
+def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n): #per ogni coppia di file bed esegue n confronti
     # extract a pair of bed files
     match_scores = []
 
@@ -127,14 +128,14 @@ def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n):
     arguments = matrices_extractors, genes, gene_list
 
     for i in range(n):
-        match_scores.append(random_comparison(arguments, i))  # effettua i confronti random veri e propri
+        match_scores.append(random_comparison(arguments, i))  # effettua n confronti random
 
-    # if save_random_match_scores:
-    #     create_dir_if_not_exist([random_comparisons_folder_match_scores])
-    #     for i in range(len(match_scores)):
-    #         save_dir = os.path.join(random_comparisons_folder_match_scores, match_scores[i]["pair_name"])
-    #         create_dir_if_not_exist([save_dir])
-    #         match_scores[i]["match_score"].to_csv(os.path.join(save_dir, str(i) + ".csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+    if save_random_match_scores:
+        create_dir_if_not_exist([random_comparisons_folder_match_scores])
+        for i in range(len(match_scores)):
+            save_dir = os.path.join(random_comparisons_folder_match_scores, match_scores[i]["pair_name"])
+            create_dir_if_not_exist([save_dir])
+            match_scores[i]["match_score"].to_csv(os.path.join(save_dir, str(i) + ".csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
     return match_scores
 

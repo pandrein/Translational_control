@@ -14,24 +14,75 @@ import pandas as pd
 # COMPARING DIGITAL PROFILES ##=========================================================================================
 # Compares the matrices 01 pairwise, row by row. Assigns a similarity score to each comparison.
 
+# def compare_pair(pair, genes_lengths, gene_list):
+#     pair_names = [pair[0]['file_name'], pair[1]['file_name']]
+#     pair_matrix = [pair[0]['matrix'], pair[1]['matrix']]
+#     # selects for each matrix only the genes in common
+#     pair_matrix_cleaned = [f.loc[gene_list, :] for f in pair_matrix]
+#     # binarize (True for each element equal to 1) and convert to numpy
+#     pair_matrix_binarized = [(f == 1).to_numpy() for f in pair_matrix_cleaned]
+#     # stacks the pair in a multidimensional array
+#     pair_matrix_binarized_stack = np.stack(pair_matrix_binarized)
+#     # generates matrix_comparison and match_scores
+#     pair_comparison = np.all(pair_matrix_binarized_stack, axis=0)
+#     match_score = np.sum(pair_comparison, axis=1)
+#     # selects only the lengths of genes in common
+#     genes_lengths = genes_lengths.loc[gene_list, :]["GeneLength"]
+#     # divides for the gene length
+#     match_score = 2 * match_score / genes_lengths   #calculates the relative number of matches --> the ratio between the number of matches and the length of the ORF
+#     return match_score, pair_names
+
 def compare_pair(pair, genes_lengths, gene_list):
     pair_names = [pair[0]['file_name'], pair[1]['file_name']]
     pair_matrix = [pair[0]['matrix'], pair[1]['matrix']]
     # selects for each matrix only the genes in common
+
+    # pair_names = ["DATASET1","DATSET2"]
+    # pair_matrix = [pd.DataFrame([[ 1, -1, np.nan, np.nan],[1, 1, 1, np.nan]],columns=['0', '1', '2', '3'],index=["Gene1","Gene2"]),pd.DataFrame([[1, -1, 1, 1,1, np.nan, np.nan],[1, 1, 1, -1, np.nan, np.nan]],columns=['0','1', '2','3','4','5','6'],index=["Gene1","Gene2"])]
+    # genes_lengths = pd.DataFrame([[5],	[4]],columns=["GeneLength"],index=["Gene1","Gene2"])
+    # pair_matrix[0].to_csv("matrix_01_1", index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+    # pair_matrix[1].to_csv("matrix_01_2", index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+    #
+    # gene_list = ["Gene1","Gene2"]
+
     pair_matrix_cleaned = [f.loc[gene_list, :] for f in pair_matrix]
-    # binarize (True for each element equal to 1) and convert to numpy
-    pair_matrix_with_same_col_dim = [f.to_numpy()[:, ~np.isnan(f).all(0)] for f in pair_matrix_cleaned]
-    pair_matrix_binarized = [f == 1 for f in pair_matrix_with_same_col_dim]
-    # pair_matrix_binarized = [(f == 1).to_numpy() for f in pair_matrix_cleaned]
+
+    # pair_matrix_with_same_col_dim = [f.to_numpy()[:, ~np.isnan(f).all(0)] for f in pair_matrix_cleaned]
+
+    sizes = [f.shape for f in pair_matrix_cleaned]
+    max_size = max(sizes, key=lambda x:x[1])[1]
+
+    pair_matrix_with_same_col_dim = []
+    for m in pair_matrix_cleaned:
+        size = m.shape[1]
+        fill_range = np.arange(size, max_size)
+        fill_range = [str(item) for item in fill_range]
+        pair_matrix_with_same_col_dim.append(m.reindex(list(m) + fill_range, axis=1))
+
+    # pair_matrix_with_same_col_dim = [f.fillna(1) for f in pair_matrix_with_same_col_dim]
+
+    # the sum for the matching 1 values
+    pair_matrix_binarized_1 = [f == 1 for f in pair_matrix_with_same_col_dim]
     # stacks the pair in a multidimensional array
-    pair_matrix_binarized_stack = np.stack(pair_matrix_binarized)
+    pair_matrix_binarized_stack_1 = np.stack(pair_matrix_binarized_1)
     # generates matrix_comparison and match_scores
-    pair_comparison = np.all(pair_matrix_binarized_stack, axis=0)
-    match_score = np.sum(pair_comparison, axis=1)
+    pair_comparison_1 = np.all(pair_matrix_binarized_stack_1, axis=0)
+    sum_1 = np.sum(pair_comparison_1, axis=1)
+
+    # the sum for the matching -1 values
+    pair_matrix_binarized_minus1 = [f == -1 for f in pair_matrix_with_same_col_dim]
+    # stacks the pair in a multidimensional array
+    pair_matrix_binarized_stack_minus1 = np.stack(pair_matrix_binarized_minus1)
+    # generates matrix_comparison and match_scores
+    pair_comparison_minus1 = np.all(pair_matrix_binarized_stack_minus1, axis=0)
+    sum_minus1 = np.sum(pair_comparison_minus1, axis=1)
+
+    sum = sum_1+sum_minus1
     # selects only the lengths of genes in common
+
     genes_lengths = genes_lengths.loc[gene_list, :]["GeneLength"]
     # divides for the gene length
-    match_score = 2 * match_score / genes_lengths  # calculates the relative number of matches --> the ratio between the number of matches and the length of the ORF
+    match_score = sum / genes_lengths  # calculates the relative number of matches --> the ratio between the number of matches and the length of the ORF
     return match_score, pair_names
 
 

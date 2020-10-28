@@ -87,6 +87,8 @@ def compute_real_match_scores(genes, bed_files_dicts, save_results=True):
     print("start real matrix digitalization...")
     matrix_01_list = signal_digitalisation(genes, bed_files_dicts, areReadsRandomized=False, add_small_random_value=add_small_random_value_to_real_scores)
     print("digitalization complete...")
+    # first = matrix_01_list[0]["matrix"]
+    # second = matrix_01_list[1]["matrix"]
 
     # gets the gene list for each matrix
     gene_lists = [pd.DataFrame(f['matrix'].index, columns={"GeneID"}) for f in matrix_01_list]
@@ -220,11 +222,11 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
             if len(bh_selected) == len(pair_names_list):
                 reproducible_genes.append(gene)
 
-    reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
-    # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
-    first_matrix_01_with_only_reproducible_genes[~reproducible_sequence_mask] = 0
-    reproducible_sequence = pd.DataFrame(first_matrix_01_with_only_reproducible_genes, index=reproducible_genes)
-    reproducible_sequence.to_csv(os.path.join(reproducible_sequence_output_dir, "reproducible_sequence.csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+    # reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
+    # # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
+    # first_matrix_01_with_only_reproducible_genes[~reproducible_sequence_mask] = 0
+    # reproducible_sequence = pd.DataFrame(first_matrix_01_with_only_reproducible_genes, index=reproducible_genes)
+    # reproducible_sequence.to_csv(os.path.join(reproducible_sequence_output_dir, "reproducible_sequence.csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
 
 def extract_reproducible_sequences(reproducible_genes, matrix_01_list):
