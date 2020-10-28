@@ -222,28 +222,40 @@ def calc_reproducible_sequences(match_scores_list, gene_list, pair_names_list, m
             if len(bh_selected) == len(pair_names_list):
                 reproducible_genes.append(gene)
 
-    # reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
-    # # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
-    # first_matrix_01_with_only_reproducible_genes[~reproducible_sequence_mask] = 0
-    # reproducible_sequence = pd.DataFrame(first_matrix_01_with_only_reproducible_genes, index=reproducible_genes)
-    # reproducible_sequence.to_csv(os.path.join(reproducible_sequence_output_dir, "reproducible_sequence.csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
+    reproducible_sequence_mask, first_matrix_01_with_only_reproducible_genes = extract_reproducible_sequences(reproducible_genes, matrix_01_list)
+    # take the first matrix 01 with only reproducible genes and put to zero the non reproducible parts
+    first_matrix_01_with_only_reproducible_genes[~reproducible_sequence_mask] = 0
+    reproducible_sequence = pd.DataFrame(first_matrix_01_with_only_reproducible_genes, index=reproducible_genes)
+    reproducible_sequence.to_csv(os.path.join(reproducible_sequence_output_dir, "reproducible_sequence.csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
 
 
 def extract_reproducible_sequences(reproducible_genes, matrix_01_list):
     # for each matrix_01 select only the reproducible genes
     reproducible_genes_tables = [matrix_01_struct['matrix'][matrix_01_struct['matrix'].index.isin(reproducible_genes)] for matrix_01_struct in matrix_01_list]
     # select the elements that are one for all the sequences
-    sequences_ones_mask = [(f == 1).to_numpy() for f in reproducible_genes_tables]
+    sizes = [f.shape for f in reproducible_genes_tables]
+    max_size = max(sizes, key=lambda x:x[1])[1]
+
+    matrix_with_same_col_dim = []
+    for m in reproducible_genes_tables:
+        size = m.shape[1]
+        fill_range = np.arange(size, max_size)
+        fill_range = [str(item) for item in fill_range]
+        matrix_with_same_col_dim.append(m.reindex(list(m) + fill_range, axis=1))
+
+    sequences_ones_mask = [(f == 1).to_numpy() for f in matrix_with_same_col_dim]
+    # print(np.shape(sequences_ones_mask[0]))
+    # print(np.shape(sequences_ones_mask[1]))
     sequences_ones_mask = np.stack(sequences_ones_mask)
     all_ones = np.all(sequences_ones_mask, axis=0)
     # select the elements that are minus one for all the sequences
-    sequences_minus_ones_mask = [(f == -1).to_numpy() for f in reproducible_genes_tables]  # FIX ME verifica se si può valutare la condizione di uguaglianza con -1 e 1 in un passo solo
+    sequences_minus_ones_mask = [(f == -1).to_numpy() for f in matrix_with_same_col_dim]  # FIX ME verifica se si può valutare la condizione di uguaglianza con -1 e 1 in un passo solo
     sequences_minus_ones_mask = np.stack(sequences_minus_ones_mask)
     all_minus_ones = np.all(sequences_minus_ones_mask, axis=0)
     # get a mask with all the elements that are one and minus one for all the sequences
     reproducible_sequence_mask = np.stack([all_ones, all_minus_ones])
     reproducible_sequence_mask = np.any(reproducible_sequence_mask, axis=0)
-    return reproducible_sequence_mask, reproducible_genes_tables[0].to_numpy()
+    return reproducible_sequence_mask, matrix_with_same_col_dim[0].to_numpy()
 
 
 def main():

@@ -27,7 +27,7 @@ random_comparisons_folder_matrix_01 = os.path.join(os.getcwd(), "random_comparis
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results])
 
-num_comparison = 1  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 10  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 
 save_random_match_scores = True
 save_matrix_01 = True
