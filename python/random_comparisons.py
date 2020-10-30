@@ -10,6 +10,8 @@ from Signal_digitalisation_human import MatricesExtractor
 from utils import InputFileManager
 from utils import create_dir_if_not_exist
 
+np.random.seed(10)
+
 add_small_random_value_to_random_comparison = False
 
 num_cores = multiprocessing.cpu_count()
@@ -114,7 +116,7 @@ def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
     return match_scores
 
 
-def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n): #per ogni coppia di file bed esegue n confronti
+def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n): # per ogni coppia di file bed esegue n confronti
     # extract a pair of bed files
     match_scores = []
 

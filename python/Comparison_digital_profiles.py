@@ -19,6 +19,8 @@ from natsort import natsorted, ns
 from itertools import combinations
 from pathlib import Path
 
+np.random.seed(10)
+
 # COMPARING DIGITAL PROFILES ##=========================================================================================
 # Compares the matrices 01 pairwise, row by row. Assigns a similarity score to each comparison.
 

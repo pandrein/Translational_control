@@ -13,6 +13,8 @@ from Signal_digitalisation_human import MatricesExtractor
 from utils import InputFileManager
 from utils import create_dir_if_not_exist
 
+np.random.seed(10)
+
 np.set_printoptions(threshold=sys.maxsize)
 
 load_intermediate_results_from_csv = False

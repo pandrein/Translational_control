@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+np.random.seed(10)
 
 # COMPARING DIGITAL PROFILES ##=========================================================================================
 # Compares the matrices 01 pairwise, row by row. Assigns a similarity score to each comparison.
