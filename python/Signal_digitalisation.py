@@ -74,10 +74,9 @@ class MatricesExtractor:
 
         # converts the matrices to pandas dataFrame
         gene_name_list = bed_table_FP_reduced.index.unique()
-        pd_matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
 
-        return pd_matrix_coverage, matrix_01
+        return matrix_01
 
     def create_matrix_coverage(self, gen_list, gen_max_lenght):
         # CREATING MATRIX COVERAGE
@@ -163,11 +162,11 @@ def main():
 
         me = MatricesExtractor(bed_table_FP_reduced, genes)
         # extract the matrices
-        pd_matrix_coverage, matrix_01 = me.extract_matrices(addRand=m_addRand, areReadsRandomized=m_areReadsRandomized)
+        matrix_01 = me.extract_matrices(addRand=m_addRand, areReadsRandomized=m_areReadsRandomized)
 
         # Exports the dataFrames into CSV files
         matrix_01.to_csv(matrix_01_csv_path, index=True)
-        pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
+        # pd_matrix_coverage.to_csv(coverage_matrix_csv_path, index=True)
 
 
 if __name__ == '__main__':

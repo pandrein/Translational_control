@@ -15,13 +15,13 @@ np.random.seed(10)
 add_small_random_value_to_random_comparison = False
 
 num_cores = multiprocessing.cpu_count()
-num_task = num_cores - 1
+num_task = 5
 
 # I/O directories
-input_dir = os.path.join(os.getcwd(), "check_reduced/")  # get the path to the data input directory
+input_dir = os.path.join(os.getcwd(), "alignToCDS_bed/alignToCDS_bed")  # get the path to the data input directory
 match_scores_output_dir = os.path.join(os.getcwd(), "matrix_python/match_scores/")  # Sets the directory where all the saved outputs will be stored
 reproducible_sequence_output_dir = os.path.join(os.getcwd(), "matrix_python/reproducible_sequence/")  # Sets the directory where all the saved outputs will be stored
-genes_lengths_path = os.path.join(os.getcwd(), "gene_lengths.csv")  # path to upload the file containing each gene's ID and the correspondent gene length
+genes_lengths_path = os.path.join(os.getcwd(), "alignToCDS_bed/CDShumanGenesLengths.txt")  # path to upload the file containing each gene's ID and the correspondent gene length
 histogram_plot_path = os.path.join(os.getcwd(), "genes_histograms/")  # path to upload the file containing each gene's ID and the correspondent gene length
 intermediate_results = os.path.join(os.getcwd(), "intermediate_results/")
 random_comparisons_folder_match_scores = os.path.join(os.getcwd(), "random_comparisons_folder_match_scores/")
@@ -29,10 +29,10 @@ random_comparisons_folder_matrix_01 = os.path.join(os.getcwd(), "random_comparis
 
 create_dir_if_not_exist([input_dir, match_scores_output_dir, histogram_plot_path, reproducible_sequence_output_dir, intermediate_results])
 
-num_comparison = 10  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
+num_comparison = 200  # NOTA: numero di confronti random da eseguire per ogni coppia di file bed
 
-save_random_match_scores = True
-save_matrix_01 = True
+save_random_match_scores = False
+save_matrix_01 = False
 
 
 def extract_gene_list(genes, bed_files_dicts):
@@ -61,28 +61,28 @@ def extract_gene_list(genes, bed_files_dicts):
     return gene_list
 
 
-def random_comparison(arguments, rep_num=0): # esegue i confronti random
-    start = time.time()
+def random_comparison(arguments, rep_num=0):  # esegue i confronti random
     matrices_extractors, genes, gene_list = arguments
     matrix_01_pair = []
     for matrices_extractor in matrices_extractors:
         bed_file_name = matrices_extractor["bed_file_name"]
         me = matrices_extractor["me"]
         # extract the matrices
-        pd_matrix_coverage, matrix_01 = me.extract_matrices(areReadsRandomized=True, add_small_random_value=add_small_random_value_to_random_comparison, rep_num=rep_num)  # estrae le matrici 01 e coverage per ogni file bed
-        matrix_01_pair.append({'matrix': matrix_01, 'file_name': bed_file_name})
-
+        # print("random comparison num: " + str(rep_num) + " extract 01 and coverage from: " + str(bed_file_name))
+        # start = time.time()
+        matrix_01_pair.append({'matrix': me.extract_matrices(areReadsRandomized=True, add_small_random_value=add_small_random_value_to_random_comparison, rep_num=rep_num), 'file_name': bed_file_name})
+        # print ("end in " + str(time.time() - start) + " sec(s)")
         if save_matrix_01:
             create_dir_if_not_exist([random_comparisons_folder_matrix_01])
             save_dir = os.path.join(random_comparisons_folder_matrix_01, bed_file_name)
             create_dir_if_not_exist([save_dir])
             matrix_01.to_csv(os.path.join(save_dir, str(rep_num) + ".csv"), index=True, header=True, decimal='.', sep=',', float_format='%.6f')
-
+    # print(" start compare pairs ")
+    # start = time.time()
     match_score, pair_names = compare_pair(matrix_01_pair, genes.set_index('GeneID'), gene_list)  # compara coppie di file bed  (di matrici 0-1)
 
     pair_names = Path(pair_names[0]).stem + ":" + Path(pair_names[1]).stem
-    end = time.time()
-    print("end_comparison in " + str(end - start) + "seconds")
+    # print("end_comparison in " + str(time.time() - start) + "seconds")
     return {'pair_name': pair_names, 'match_score': match_score}
 
 
@@ -116,7 +116,7 @@ def compare_pair_n_times(bed_files_pair, genes, gene_list, n):
     return match_scores
 
 
-def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n): # per ogni coppia di file bed esegue n confronti
+def compare_pair_n_times_serial(bed_files_pair, genes, gene_list, n):  # per ogni coppia di file bed esegue n confronti
     # extract a pair of bed files
     match_scores = []
 
@@ -146,7 +146,7 @@ def main(num):
     print("num of core available: " + str(num_cores) + " used: " + str(num_task))
 
     ifm = InputFileManager(genes_lengths_path, input_dir)
-    genes = ifm.get_genes()
+    genes = ifm.get_genes_human()
     bed_files_dicts = ifm.get_bed_files()
     gene_list = extract_gene_list(genes, bed_files_dicts)
 
@@ -156,14 +156,18 @@ def main(num):
 
     match_scores_list = []
 
-    # start = time.time()
-    # for bed_files_pair in bed_files_pairs:
-    #     match_scores_list.append(compare_pair_n_times(bed_files_pair, genes, gene_list, num_comparison))
-    # end = time.time()
-    # print('fake matrix comparisons completed in ' + str(end - start) + " sec(s)")
-
     for bed_files_pair in bed_files_pairs:
-        match_scores_list.append(compare_pair_n_times_serial(bed_files_pair, genes, gene_list, num_comparison))
+        start = time.time()
+        match_scores_list.append(compare_pair_n_times(bed_files_pair, genes, gene_list, num_comparison))
+        end = time.time()
+        print("fake matrix comparisons " + bed_files_pair[0]["bed_file_name"] + " vs " + bed_files_pair[1]["bed_file_name"] + " completed in " + str(end - start) + " sec(s)")
+
+    #for bed_files_pair in bed_files_pairs:
+    #    start = time.time()
+    #    print ("start comparison: " + str(bed_files_pair[0]['bed_file_name']) + "vs" + str(bed_files_pair[1]['bed_file_name']))
+    #    match_scores_list.append(compare_pair_n_times_serial(bed_files_pair, genes, gene_list, num_comparison))
+    #    end = time.time()
+    #    print("fake matrix comparisons " + bed_files_pair[0]["bed_file_name"] + " vs " + bed_files_pair[1]["bed_file_name"] + " completed in " + str(end - start) + " sec(s)")
 
     with open(intermediate_results + '/match_scores_list_' + str(num) + '_aggregating_' + str(num_comparison) + 'comparisons.npy', 'wb') as f:
         np.save(f, match_scores_list)

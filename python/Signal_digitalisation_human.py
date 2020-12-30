@@ -13,10 +13,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pyranges as pr
 import sys
 import time
 from utils import create_dir_if_not_exist
+
+import warnings
+warnings.filterwarnings("ignore")
 
 np.random.seed(10)
 
@@ -57,17 +59,17 @@ class MatricesExtractor:
         if areReadsRandomized:
             bed_table_FP_reduced = self.randomize_reads(bed_table_FP_reduced)  # randomizza tutte le reads
 
-        random_start_reads = bed_table_FP_reduced["Start"]
-        group_by_genes = random_start_reads.groupby("Chromosome")
+        # random_start_reads = bed_table_FP_reduced["Start"]
+        # group_by_genes = random_start_reads.groupby("Chromosome")
 
-        if areReadsRandomized:
-            folder_rand_reads = "./reads_random/"
-            create_dir_if_not_exist([folder_rand_reads])
-
-            for name_of_the_group, group in group_by_genes:  # salva le reads random FIX ME andrebbe fatto solo quando areReadsRandomized = True???
-                creation_path = os.path.join(folder_rand_reads, name_of_the_group)
-                create_dir_if_not_exist([creation_path])
-                group.to_csv(os.path.join(creation_path, "bedfile_" + self.bed_file_name + "_rep_" + str(rep_num) + ".csv"))
+        # if areReadsRandomized:
+        #     folder_rand_reads = "./reads_random/"
+        #     create_dir_if_not_exist([folder_rand_reads])
+        #
+        #     for name_of_the_group, group in group_by_genes:  # salva le reads random FIX ME andrebbe fatto solo quando areReadsRandomized = True???
+        #         creation_path = os.path.join(folder_rand_reads, name_of_the_group)
+        #         create_dir_if_not_exist([creation_path])
+                #group.to_csv(os.path.join(creation_path, "bedfile_" + self.bed_file_name + "_rep_" + str(rep_num) + ".csv"))
 
         gen_list = []
         gene_name_list = []
@@ -76,9 +78,8 @@ class MatricesExtractor:
             gene_name_list.append(name_of_the_group)
         matrix_coverage = self.create_matrix_coverage(gen_list, self.gen_max_lenght)  # crea la matrice di coverage
         matrix_01 = self.create_matrix_01(matrix_coverage, add_small_random_value=add_small_random_value) # crea la matrice 01
-        matrix_coverage = pd.DataFrame(matrix_coverage, index=gene_name_list)
         matrix_01 = pd.DataFrame(matrix_01, index=gene_name_list)
-        return matrix_coverage, matrix_01
+        return matrix_01
 
     def create_matrix_coverage(self, gen_list, gen_max_lenght):
         # CREATING MATRIX COVERAGE
